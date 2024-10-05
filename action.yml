@@ -1,0 +1,12 @@
+name: "Setup Microsoft CRM SDK"
+description: "Used to automate Microsoft CRM processes."
+author: "Marcus Hooper"
+branding:
+  icon: play
+  color: blue
+runs:
+  using: composite
+  steps:
+    - name: Run Install Dynamics CRM SDK and set environment variable
+      shell: powershell
+      run: ${{ github.action_path }}\Install-CrmSdk.ps1
