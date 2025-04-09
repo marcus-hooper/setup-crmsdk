@@ -9,6 +9,20 @@ function Write-Message {
     Write-Host "[$Level] $Message"
 }
 
+# Function to safely execute a command and handle errors
+function Invoke-Safely {
+    param (
+        [scriptblock]$Command,
+        [string]$ErrorMessage
+    )
+    try {
+        & $Command
+    } catch {
+        Write-Message $ErrorMessage "ERROR"
+        Exit 1
+    }
+}
+
 # Check if the CRM_SDK_PATH environment variable is already set
 if (-not (Get-ChildItem -Path "env:CRM_SDK_PATH" -ErrorAction SilentlyContinue)) {
     Write-Message "CRM_SDK_PATH is not set. Proceeding with installation."
@@ -24,40 +38,43 @@ if (-not (Get-ChildItem -Path "env:CRM_SDK_PATH" -ErrorAction SilentlyContinue))
     $nugetPath = Join-Path -Path $programsPath -ChildPath "nuget.exe"
     if (-not (Test-Path $nugetPath)) {
         Write-Message "Downloading NuGet CLI to $nugetPath."
-        Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -OutFile $nugetPath -ErrorAction Stop
-    }
-    else {
+        Invoke-Safely {
+            Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -OutFile $nugetPath -ErrorAction Stop
+        } "Failed to download NuGet CLI."
+    } else {
         Write-Message "NuGet CLI already exists at $nugetPath. Skipping download."
     }
 
     # Add NuGet source if not already added
     Push-Location $programsPath
-    & $nugetPath sources Add -Name MySource -Source https://api.nuget.org/v3/index.json
+    Invoke-Safely {
+        & $nugetPath sources Add -Name MySource -Source https://api.nuget.org/v3/index.json
+    } "Failed to add NuGet source."
     Write-Message "NuGet source added."
 
     # Install the Microsoft.CrmSdk.CoreTools package
     Write-Message "Installing Microsoft.CrmSdk.CoreTools package."
-    & $nugetPath install Microsoft.CrmSdk.CoreTools
+    Invoke-Safely {
+        & $nugetPath install Microsoft.CrmSdk.CoreTools
+    } "Failed to install Microsoft.CrmSdk.CoreTools package."
 
     # Locate the SolutionPackager.exe file and set the CRM_SDK_PATH environment variable
-    $solutionPackager = Get-ChildItem -Path $programsPath -Recurse -Filter "SolutionPackager.exe"
+    $solutionPackager = Get-ChildItem -Path $programsPath -Recurse -Filter "SolutionPackager.exe" -ErrorAction SilentlyContinue
     if ($solutionPackager) {
         $sdkPath = $solutionPackager.Directory.Parent.FullName
         [Environment]::SetEnvironmentVariable("CRM_SDK_PATH", $sdkPath, "User")
         $env:CRM_SDK_PATH = $sdkPath
         Write-Message "CRM_SDK_PATH set to $sdkPath."
-    }
-    else {
+    } else {
         Write-Message "SolutionPackager.exe not found. Installation failed." "ERROR"
         Exit 1
     }
 
     # Clean up the NuGet CLI
-    Remove-Item $nugetPath -Force
+    Remove-Item $nugetPath -Force -ErrorAction SilentlyContinue
     Write-Message "Cleaned up NuGet CLI."
 
     Pop-Location
-}
-else {
+} else {
     Write-Message "CRM_SDK_PATH is already set to $env:CRM_SDK_PATH. Skipping installation."
 }
