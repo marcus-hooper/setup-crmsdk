@@ -48,7 +48,7 @@ jobs:
       - name: Verify SolutionPackager exists
         shell: powershell
         run: |
-          $solutionPackager = Join-Path $env:CRM_SDK_PATH "tools\SolutionPackager.exe"
+          $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
           if (-not (Test-Path $solutionPackager)) {
             Write-Host "::error::SolutionPackager.exe not found at expected path"
             exit 1
