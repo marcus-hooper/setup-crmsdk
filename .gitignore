@@ -1,0 +1,33 @@
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# PowerShell
+*.ps1xml
+*.pssc
+*.psd1.bak
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+
+# Build artifacts
+bin/
+obj/
+out/
+
+# Test results
+test-results.xml
+coverage.xml
+TestResults/
+
+# NuGet
+*.nupkg
+nuget.exe
+
+# OS files
+.DS_Store

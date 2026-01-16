@@ -1,0 +1,67 @@
+name: Scheduled Health Check
+
+on:
+  schedule:
+    # Run weekly on Monday at 6:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    # Allow manual trigger for debugging
+
+jobs:
+  health-check:
+    name: Verify External Dependencies
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify NuGet CLI is downloadable
+        shell: pwsh
+        run: |
+          $response = Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -Method Head -UseBasicParsing
+          if ($response.StatusCode -ne 200) {
+            Write-Error "NuGet CLI endpoint returned status $($response.StatusCode)"
+            exit 1
+          }
+          Write-Host "NuGet CLI endpoint is accessible (HTTP $($response.StatusCode))"
+
+      - name: Verify CrmSdk package exists on NuGet
+        shell: pwsh
+        run: |
+          $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.crmsdk.coretools/index.json" -UseBasicParsing
+          $latestVersion = $response.versions | Select-Object -Last 1
+          Write-Host "Microsoft.CrmSdk.CoreTools is available on NuGet (latest: $latestVersion)"
+
+      - name: Run setup-crmsdk action
+        uses: ./
+
+      - name: Verify CRM_SDK_PATH is set
+        shell: powershell
+        run: |
+          if (-not $env:CRM_SDK_PATH) {
+            Write-Host "::error::CRM_SDK_PATH environment variable is not set"
+            exit 1
+          }
+          Write-Host "CRM_SDK_PATH is set to: $env:CRM_SDK_PATH"
+
+      - name: Verify SolutionPackager exists
+        shell: powershell
+        run: |
+          $solutionPackager = Join-Path $env:CRM_SDK_PATH "tools\SolutionPackager.exe"
+          if (-not (Test-Path $solutionPackager)) {
+            Write-Host "::error::SolutionPackager.exe not found at expected path"
+            exit 1
+          }
+          Write-Host "SolutionPackager.exe found at: $solutionPackager"
+
+      - name: Verify SolutionPackager executes
+        shell: powershell
+        run: |
+          $solutionPackager = Join-Path $env:CRM_SDK_PATH "tools\SolutionPackager.exe"
+          & $solutionPackager /? | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::SolutionPackager.exe failed to execute"
+            exit 1
+          }
+          Write-Host "SolutionPackager.exe executes successfully"
