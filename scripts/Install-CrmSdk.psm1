@@ -146,7 +146,7 @@ function Install-CrmSdkPackage {
 
         $exitCode = Invoke-NuGetInstall -NuGetPath $NuGetPath -PackageName 'Microsoft.CrmSdk.CoreTools' -OutputDirectory $InstallPath
         if ($exitCode -ne 0) {
-            throw 'NuGet install command failed with exit code {0}' -f $exitCode
+            throw ('NuGet install command failed with exit code {0}' -f $exitCode)
         }
     }
     finally {
