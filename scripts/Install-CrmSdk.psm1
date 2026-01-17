@@ -119,7 +119,7 @@ function Invoke-NuGetInstall {
         [string]$OutputDirectory
     )
 
-    & $NuGetPath install $PackageName -OutputDirectory $OutputDirectory
+    & $NuGetPath install $PackageName -OutputDirectory $OutputDirectory | Write-Host
     return $LASTEXITCODE
 }
 
