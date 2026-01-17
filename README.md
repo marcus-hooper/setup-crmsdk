@@ -1,7 +1,9 @@
 # setup-crmsdk
 
 [![CI](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/marcus-hooper/setup-crmsdk/graph/badge.svg)](https://codecov.io/gh/marcus-hooper/setup-crmsdk)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://securityscorecards.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_PATH` environment variable for use in CI/CD workflows.
 
@@ -12,18 +14,73 @@ A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_P
 - Skips installation if SDK is already installed
 - Automatic cleanup of temporary files
 
+## Quick Start
+
+```yaml
+- name: Setup CRM SDK
+  uses: marcus-hooper/setup-crmsdk@v1
+```
+
 ## Usage
+
+### Basic Usage
 
 ```yaml
 - name: Setup CRM SDK
   id: crmsdk
-  uses: marcus-hooper/setup-crmsdk@main
+  uses: marcus-hooper/setup-crmsdk@v1
 
 - name: Run SolutionPackager
   run: |
-    $solutionPackager = Join-Path $env:CRM_SDK_PATH "tools\SolutionPackager.exe"
+    $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
     & $solutionPackager /action:Extract /zipfile:solution.zip /folder:solution
   shell: powershell
+```
+
+### Using Outputs
+
+```yaml
+- name: Setup CRM SDK
+  id: crmsdk
+  uses: marcus-hooper/setup-crmsdk@v1
+
+- name: Display SDK path
+  run: echo "SDK installed at ${{ steps.crmsdk.outputs.sdk-path }}"
+```
+
+### Complete Workflow Example
+
+Here's a complete workflow that extracts a Dynamics 365 solution:
+
+```yaml
+name: Extract Solution
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  extract:
+    name: Extract Solution
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup CRM SDK
+        id: crmsdk
+        uses: marcus-hooper/setup-crmsdk@v1
+
+      - name: Extract solution
+        run: |
+          $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
+          & $solutionPackager /action:Extract /zipfile:MySolution.zip /folder:./solution /packagetype:Both
+        shell: powershell
+
+      - name: Upload extracted solution
+        uses: actions/upload-artifact@v6
+        with:
+          name: solution
+          path: ./solution
 ```
 
 ## Outputs
@@ -31,17 +88,6 @@ A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_P
 | Output | Description |
 |--------|-------------|
 | `sdk-path` | Path to the installed CRM SDK directory |
-
-### Using Outputs
-
-```yaml
-- name: Setup CRM SDK
-  id: crmsdk
-  uses: marcus-hooper/setup-crmsdk@main
-
-- name: Display SDK path
-  run: echo "SDK installed at ${{ steps.crmsdk.outputs.sdk-path }}"
-```
 
 ## Environment Variables
 
@@ -53,17 +99,144 @@ This action sets the following environment variable:
 
 ## What Gets Installed
 
-The action installs the [Microsoft.CrmSdk.CoreTools](https://www.nuget.org/packages/Microsoft.CrmSdk.CoreTools) NuGet package, which includes:
+The action installs the [Microsoft.CrmSdk.CoreTools](https://www.nuget.org/packages/Microsoft.CrmSdk.CoreTools) NuGet package. The tools are located in the `coretools` subdirectory under `CRM_SDK_PATH`:
 
 - **SolutionPackager.exe** - Pack and unpack Dynamics 365 solution files
 - **PackageDeployer.exe** - Deploy packages to Dynamics 365
 - **CrmSvcUtil.exe** - Generate early-bound entity classes
 - **PluginRegistration.exe** - Register plugins and custom workflow activities
 
+Access tools using: `Join-Path $env:CRM_SDK_PATH "coretools\ToolName.exe"`
+
 ## Requirements
 
 - Windows runner (`runs-on: windows-latest`)
 - Internet access to download NuGet packages
+
+## How It Works
+
+1. Checks if `CRM_SDK_PATH` is already set (skips installation if exists)
+2. Creates installation directory at `$env:LOCALAPPDATA\Programs\`
+3. Downloads NuGet CLI from `dist.nuget.org`
+4. Installs `Microsoft.CrmSdk.CoreTools` package via NuGet
+5. Locates `SolutionPackager.exe` and sets `CRM_SDK_PATH` to its directory
+6. Exports the path to `GITHUB_ENV` for subsequent workflow steps
+7. Cleans up the NuGet CLI
+
+## Troubleshooting
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| `Unable to download NuGet` | Firewall or network restrictions | Ensure runner has access to `dist.nuget.org` |
+| `Package not found` | NuGet.org unreachable | Check network connectivity and retry |
+| `SolutionPackager.exe not found` | Package structure changed | Open an issue with the error details |
+| Action completes but tools not available | `CRM_SDK_PATH` not in path | Use `$env:CRM_SDK_PATH` or the `sdk-path` output |
+| Action skipped installation | SDK already installed | This is expected behavior; the action reuses existing installations |
+
+### Debug Tips
+
+1. **Check workflow logs** - Expand the "Setup CRM SDK" step for detailed output
+2. **Verify environment variable** - Add a step to echo `$env:CRM_SDK_PATH`
+3. **Check runner type** - This action only works on Windows runners
+4. **Self-hosted runners** - Ensure write access to `$env:LOCALAPPDATA\Programs\`
+
+## Development
+
+### Requirements
+
+- PowerShell 5.1+ (Windows)
+- PSScriptAnalyzer (for linting)
+
+### Local Testing
+
+```powershell
+# Run the script directly
+.\scripts\Install-CrmSdk.ps1
+
+# Check if environment variable was set
+$env:CRM_SDK_PATH
+
+# Verify SolutionPackager exists
+Test-Path (Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe")
+```
+
+### Linting
+
+```powershell
+# Install PSScriptAnalyzer if needed
+Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+
+# Run linter
+Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery
+```
+
+### Formatting
+
+```powershell
+# Check formatting (CI runs this automatically)
+Get-ChildItem -Path ./scripts -Filter *.ps1 -Recurse | ForEach-Object {
+    $original = Get-Content -Path $_.FullName -Raw
+    $formatted = Invoke-Formatter -ScriptDefinition $original
+    if ($original -ne $formatted) {
+        Write-Host "Needs formatting: $($_.Name)"
+    }
+}
+
+# Auto-format a file
+$content = Get-Content -Path ./scripts/Install-CrmSdk.ps1 -Raw
+Invoke-Formatter -ScriptDefinition $content | Set-Content -Path ./scripts/Install-CrmSdk.ps1
+```
+
+### Running Tests
+
+```powershell
+# Run Pester tests
+Invoke-Pester -Path ./tests -Output Detailed
+```
+
+## Project Structure
+
+```
+setup-crmsdk/
+├── action.yml                  # GitHub Action definition (composite action)
+├── scripts/
+│   ├── Install-CrmSdk.ps1      # Main PowerShell installation script
+│   └── Install-CrmSdk.psm1     # PowerShell module for testing
+├── tests/                      # Pester unit tests
+├── .github/
+│   ├── dependabot.yml          # Dependabot configuration
+│   ├── ISSUE_TEMPLATE/         # Issue templates
+│   └── workflows/
+│       ├── ci.yml              # CI workflow (lint + test + coverage)
+│       ├── dependabot-automerge.yml  # Auto-merge Dependabot PRs
+│       ├── labels.yml          # Label synchronization
+│       ├── release.yml         # Release management
+│       ├── schedule.yml        # Scheduled health checks
+│       ├── scorecard.yml       # OpenSSF Scorecard analysis
+│       ├── security.yml        # Security scanning
+│       └── validate.yml        # Action validation
+├── README.md                   # This file
+├── LICENSE                     # MIT License
+├── CHANGELOG.md                # Version history
+└── SECURITY.md                 # Security policy
+```
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Check existing [issues](https://github.com/marcus-hooper/setup-crmsdk/issues) or open a new one
+2. Fork the repository
+3. Create a feature branch (`git checkout -b feature/my-feature`)
+4. Make your changes and add tests if applicable
+5. Ensure CI passes (lint and test)
+6. Submit a pull request
+
+See the issue templates for [bug reports](.github/ISSUE_TEMPLATE/bug_report.md) and [feature requests](.github/ISSUE_TEMPLATE/feature_request.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities.
 
 ## License
 

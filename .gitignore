@@ -2,6 +2,12 @@
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+nul
+NUL
+
+# Claude Code
+.claude/
+CLAUDE.local.md
 
 # PowerShell
 *.ps1xml

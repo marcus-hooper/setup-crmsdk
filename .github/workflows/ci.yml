@@ -3,17 +3,77 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/*.md'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/*.md'
+      - 'LICENSE'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  validate-changelog:
+    name: Validate CHANGELOG
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate CHANGELOG format
+        run: |
+          echo "Validating CHANGELOG.md format..."
+          if [[ ! -f CHANGELOG.md ]]; then
+            echo "::error::CHANGELOG.md not found"
+            exit 1
+          fi
+          if ! grep -qE "^## \[Unreleased\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md missing '## [Unreleased]' section"
+            exit 1
+          fi
+          echo "CHANGELOG.md format valid"
+
   lint:
     name: PSScriptAnalyzer
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          persist-credentials: false
 
       - name: Run PSScriptAnalyzer
         shell: pwsh
@@ -26,12 +86,131 @@ jobs:
           }
           Write-Host "No issues found"
 
-  test:
-    name: Test Action
-    runs-on: windows-latest
+  format-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check PowerShell formatting
+        shell: pwsh
+        run: |
+          $hasErrors = $false
+          Get-ChildItem -Path ./scripts -Filter *.ps1 -Recurse | ForEach-Object {
+            $original = Get-Content -Path $_.FullName -Raw
+            $formatted = Invoke-Formatter -ScriptDefinition $original
+            if ($original -ne $formatted) {
+              Write-Host "::error file=$($_.FullName)::File is not properly formatted"
+              $hasErrors = $true
+            }
+          }
+          Get-ChildItem -Path ./scripts -Filter *.psm1 -Recurse | ForEach-Object {
+            $original = Get-Content -Path $_.FullName -Raw
+            $formatted = Invoke-Formatter -ScriptDefinition $original
+            if ($original -ne $formatted) {
+              Write-Host "::error file=$($_.FullName)::File is not properly formatted"
+              $hasErrors = $true
+            }
+          }
+          if ($hasErrors) {
+            Write-Error "One or more files are not properly formatted. Run 'Invoke-Formatter' to fix."
+            exit 1
+          }
+          Write-Host "All files are properly formatted"
+
+  unit-test:
+    name: Run Pester Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            cli.codecov.io:443
+            codecov.io:443
+            github.com:443
+            ingest.codecov.io:443
+            uploader.codecov.io:443
+
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          persist-credentials: false
+
+      - name: Run Pester tests with coverage
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = 'test-results.xml'
+          $config.TestResult.OutputFormat = 'NUnitXml'
+          $config.CodeCoverage.Enabled = $true
+          $config.CodeCoverage.Path = './scripts/Install-CrmSdk.ps1'
+          $config.CodeCoverage.OutputPath = 'coverage.xml'
+          $config.CodeCoverage.OutputFormat = 'JaCoCo'
+
+          $result = Invoke-Pester -Configuration $config
+
+          $covered = $result.CodeCoverage.CommandsExecutedCount
+          $total = $result.CodeCoverage.CommandsAnalyzedCount
+          if ($total -gt 0) {
+            $percent = [math]::Round(($covered / $total) * 100, 2)
+            Write-Host "Code Coverage: $percent% ($covered/$total commands)"
+          }
+
+          if ($result.FailedCount -gt 0) {
+            exit 1
+          }
+
+      - name: Upload test results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-test:
+    name: Integration Test
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      # harden-runner only supports Linux; skip on Windows
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          persist-credentials: false
 
       - name: Run setup-crmsdk action
         uses: ./
