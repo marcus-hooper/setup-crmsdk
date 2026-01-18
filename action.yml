@@ -4,13 +4,27 @@ author: "Marcus Hooper"
 branding:
   icon: download
   color: blue
+
+inputs:
+  version:
+    description: "Version of Microsoft.CrmSdk.CoreTools to install (e.g., '9.1.0.184'). If not specified, installs the latest version."
+    required: false
+    default: ""
+
 outputs:
   sdk-path:
     description: "Path to the installed CRM SDK"
     value: ${{ env.CRM_SDK_PATH }}
+
+# NOTE: This action only supports Windows runners (windows-latest, windows-2022, etc.)
+# It requires PowerShell 5.1+ and access to NuGet.org
+
 runs:
   using: composite
   steps:
     - name: Install CRM SDK
+      id: install
       shell: powershell
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
       run: ${{ github.action_path }}\scripts\Install-CrmSdk.ps1

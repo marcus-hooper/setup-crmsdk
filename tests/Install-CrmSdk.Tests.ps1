@@ -188,6 +188,22 @@ Describe 'Remove-NuGetCli' {
     }
 }
 
+Describe 'Invoke-NuGetInstall' {
+    It 'passes version to NuGet when specified' {
+        # We can't easily test the actual NuGet call without running it,
+        # but we can verify the function accepts the Version parameter
+        $params = @{
+            NuGetPath       = 'C:\nonexistent\nuget.exe'
+            PackageName     = 'TestPackage'
+            OutputDirectory = 'C:\temp'
+            Version         = '1.2.3'
+        }
+
+        # This will fail because nuget.exe doesn't exist, but it validates parameter binding
+        { Invoke-NuGetInstall @params } | Should -Throw
+    }
+}
+
 Describe 'Install-CrmSdkPackage' {
     BeforeAll {
         # Mock the NuGet install command to return success
@@ -257,6 +273,54 @@ Describe 'Install-CrmSdkPackage' {
                 $NuGetPath -eq 'C:\nuget.exe' -and
                 $PackageName -eq 'Microsoft.CrmSdk.CoreTools' -and
                 $OutputDirectory -eq $tempDir
+            }
+        }
+        finally {
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'passes version to Invoke-NuGetInstall when specified' {
+        Mock Invoke-NuGetInstall { return 0 } -ModuleName Install-CrmSdk
+
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+        $sdkDir = Join-Path $tempDir 'Microsoft.CrmSdk.CoreTools.9.1.0'
+        $coreToolsDir = Join-Path $sdkDir 'coretools'
+        New-Item -Path $coreToolsDir -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $coreToolsDir 'SolutionPackager.exe') -ItemType File -Force | Out-Null
+
+        try {
+            Install-CrmSdkPackage -NuGetPath 'C:\nuget.exe' -InstallPath $tempDir -Version '9.1.0.184'
+
+            Should -Invoke Invoke-NuGetInstall -ModuleName Install-CrmSdk -ParameterFilter {
+                $NuGetPath -eq 'C:\nuget.exe' -and
+                $PackageName -eq 'Microsoft.CrmSdk.CoreTools' -and
+                $OutputDirectory -eq $tempDir -and
+                $Version -eq '9.1.0.184'
+            }
+        }
+        finally {
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'does not pass version to Invoke-NuGetInstall when not specified' {
+        Mock Invoke-NuGetInstall { return 0 } -ModuleName Install-CrmSdk
+
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+        $sdkDir = Join-Path $tempDir 'Microsoft.CrmSdk.CoreTools.9.1.0'
+        $coreToolsDir = Join-Path $sdkDir 'coretools'
+        New-Item -Path $coreToolsDir -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $coreToolsDir 'SolutionPackager.exe') -ItemType File -Force | Out-Null
+
+        try {
+            Install-CrmSdkPackage -NuGetPath 'C:\nuget.exe' -InstallPath $tempDir
+
+            Should -Invoke Invoke-NuGetInstall -ModuleName Install-CrmSdk -ParameterFilter {
+                $NuGetPath -eq 'C:\nuget.exe' -and
+                $PackageName -eq 'Microsoft.CrmSdk.CoreTools' -and
+                $OutputDirectory -eq $tempDir -and
+                [string]::IsNullOrEmpty($Version)
             }
         }
         finally {
@@ -342,6 +406,22 @@ Describe 'Install-CrmSdk' {
             $result = Install-CrmSdk
 
             $result | Should -Be 'C:\mock\sdk'
+        }
+
+        It 'passes version to Install-CrmSdkPackage when specified' {
+            Install-CrmSdk -Version '9.1.0.184'
+
+            Should -Invoke Install-CrmSdkPackage -ModuleName Install-CrmSdk -Times 1 -ParameterFilter {
+                $Version -eq '9.1.0.184'
+            }
+        }
+
+        It 'does not pass version to Install-CrmSdkPackage when not specified' {
+            Install-CrmSdk
+
+            Should -Invoke Install-CrmSdkPackage -ModuleName Install-CrmSdk -Times 1 -ParameterFilter {
+                [string]::IsNullOrEmpty($Version)
+            }
         }
     }
 

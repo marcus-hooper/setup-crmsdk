@@ -1,6 +1,7 @@
 name: Security
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths-ignore:
@@ -18,7 +19,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false  # Security scans should always complete
 
 permissions: {}
 
@@ -52,8 +53,6 @@ jobs:
         uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.7.1
         with:
           config-file: .github/dependency-review-config.yml
-          fail-on-severity: high
-          comment-summary-in-pr: always
 
   # Static analysis for PowerShell (complements PSScriptAnalyzer in CI)
   script-security:
@@ -63,6 +62,7 @@ jobs:
 
     permissions:
       contents: read
+      security-events: write
 
     steps:
       - name: Harden Runner
@@ -82,24 +82,45 @@ jobs:
         shell: pwsh
         run: |
           $patterns = @(
-            'password\s*=\s*[''"][^''"]+[''"]',
-            'api[_-]?key\s*=\s*[''"][^''"]+[''"]',
-            'secret\s*=\s*[''"][^''"]+[''"]',
-            'token\s*=\s*[''"][^''"]+[''"]'
+            @{ Pattern = 'password\s*=\s*[''"][^''"]+[''"]'; Description = 'Hardcoded password' },
+            @{ Pattern = 'api[_-]?key\s*=\s*[''"][^''"]+[''"]'; Description = 'Hardcoded API key' },
+            @{ Pattern = 'secret\s*=\s*[''"][^''"]+[''"]'; Description = 'Hardcoded secret' },
+            @{ Pattern = 'token\s*=\s*[''"][^''"]+[''"]'; Description = 'Hardcoded token' },
+            @{ Pattern = 'AKIA[0-9A-Z]{16}'; Description = 'AWS Access Key ID' },
+            @{ Pattern = '-----BEGIN\s+(RSA|DSA|EC|OPENSSH|PGP)?\s*PRIVATE KEY-----'; Description = 'Private key' },
+            @{ Pattern = 'connectionstring\s*=\s*[''"][^''"]+[''"]'; Description = 'Connection string' }
           )
 
           $issues = @()
-          Get-ChildItem -Path ./scripts -Include *.ps1,*.psm1 -Recurse | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw
-            foreach ($pattern in $patterns) {
-              if ($content -match $pattern) {
-                $issues += "Potential secret in $($_.Name): matches pattern '$pattern'"
+          $scanPaths = @('./scripts', './tests', './.github/workflows', '.')
+          $extensions = @('*.ps1', '*.psm1', '*.yml', '*.yaml')
+
+          foreach ($scanPath in $scanPaths) {
+            if (-not (Test-Path $scanPath)) { continue }
+
+            # For root directory, don't recurse to avoid duplicates
+            $recurse = $scanPath -ne '.'
+            $depth = if ($scanPath -eq '.') { 1 } else { 100 }
+
+            Get-ChildItem -Path $scanPath -Include $extensions -Recurse:$recurse -Depth $depth -File -ErrorAction SilentlyContinue | ForEach-Object {
+              $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+              if (-not $content) { return }
+
+              foreach ($check in $patterns) {
+                if ($content -match $check.Pattern) {
+                  $relativePath = $_.FullName -replace [regex]::Escape((Get-Location).Path + [IO.Path]::DirectorySeparatorChar), ''
+                  $issues += @{
+                    File = $relativePath
+                    Pattern = $check.Pattern
+                    Description = $check.Description
+                  }
+                }
               }
             }
           }
 
           if ($issues.Count -gt 0) {
-            $issues | ForEach-Object { Write-Host "::warning::$_" }
+            $issues | ForEach-Object { Write-Host "::warning file=$($_.File)::$($_.Description)" }
             Write-Host "::error::Found $($issues.Count) potential hardcoded secret(s)"
             exit 1
           }
@@ -107,28 +128,110 @@ jobs:
           Write-Host "No hardcoded secrets detected"
 
       - name: Check for unsafe patterns
+        id: unsafe-patterns
         shell: pwsh
         run: |
           $unsafePatterns = @(
             @{ Pattern = 'Invoke-Expression'; Description = 'Invoke-Expression can execute arbitrary code' },
-            @{ Pattern = '\| iex'; Description = 'Piping to iex can execute arbitrary code' },
-            @{ Pattern = '-Command\s+\$'; Description = 'Dynamic command execution' }
+            @{ Pattern = '\|\s*iex\b'; Description = 'Piping to iex can execute arbitrary code' },
+            @{ Pattern = '-Command\s+\$'; Description = 'Dynamic command execution' },
+            @{ Pattern = '\[scriptblock\]::Create\s*\('; Description = 'Dynamic scriptblock creation' },
+            @{ Pattern = 'DownloadString\s*\('; Description = 'Web download and execute pattern' },
+            @{ Pattern = 'DownloadFile\s*\('; Description = 'Web download pattern' },
+            @{ Pattern = 'Add-Type\s+-TypeDefinition\s+\$'; Description = 'Dynamic code compilation' },
+            @{ Pattern = 'Start-Process.*\$.*-ArgumentList\s+\$'; Description = 'Process start with dynamic arguments' }
+          )
+
+          # Allow-list: file:pattern pairs for known-safe usages
+          # Format: "relative/path/to/file.ps1:PatternToAllow"
+          $allowList = @(
+            # Example: "scripts/Install-CrmSdk.psm1:DownloadFile" - if legitimate download is needed
           )
 
           $issues = @()
-          Get-ChildItem -Path ./scripts -Include *.ps1,*.psm1 -Recurse | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw
-            foreach ($check in $unsafePatterns) {
-              if ($content -match $check.Pattern) {
-                $issues += "$($_.Name): $($check.Description)"
+          $scanPaths = @('./scripts', './tests')
+          $extensions = @('*.ps1', '*.psm1')
+
+          foreach ($scanPath in $scanPaths) {
+            if (-not (Test-Path $scanPath)) { continue }
+
+            Get-ChildItem -Path $scanPath -Include $extensions -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+              $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+              if (-not $content) { return }
+
+              $relativePath = $_.FullName -replace [regex]::Escape((Get-Location).Path + [IO.Path]::DirectorySeparatorChar), ''
+              $relativePath = $relativePath -replace '\\', '/'
+
+              foreach ($check in $unsafePatterns) {
+                # Check allow-list
+                $allowKey = "${relativePath}:$($check.Pattern)"
+                if ($allowList -contains $allowKey) {
+                  Write-Host "Skipping allowed pattern: $allowKey"
+                  continue
+                }
+
+                if ($content -match $check.Pattern) {
+                  $issues += @{
+                    File = $relativePath
+                    Pattern = $check.Pattern
+                    Description = $check.Description
+                  }
+                }
               }
             }
           }
 
+          # Generate SARIF output
+          $sarifResults = @()
+          foreach ($issue in $issues) {
+            $sarifResults += @{
+              ruleId = "unsafe-pattern"
+              level = "warning"
+              message = @{ text = $issue.Description }
+              locations = @(@{
+                physicalLocation = @{
+                  artifactLocation = @{ uri = $issue.File }
+                }
+              })
+            }
+          }
+
+          $sarif = @{
+            '$schema' = "https://json.schemastore.org/sarif-2.1.0.json"
+            version = "2.1.0"
+            runs = @(@{
+              tool = @{
+                driver = @{
+                  name = "PowerShell Security Scanner"
+                  version = "1.0.0"
+                  rules = @(@{
+                    id = "unsafe-pattern"
+                    name = "UnsafePattern"
+                    shortDescription = @{ text = "Potentially unsafe PowerShell pattern detected" }
+                    defaultConfiguration = @{ level = "warning" }
+                  })
+                }
+              }
+              results = $sarifResults
+            })
+          }
+
+          $sarif | ConvertTo-Json -Depth 10 | Set-Content -Path "security-results.sarif"
+
           if ($issues.Count -gt 0) {
-            $issues | ForEach-Object { Write-Host "::warning::$_" }
-            # Warning only - some patterns may be intentional
-            Write-Host "Found $($issues.Count) potentially unsafe pattern(s) - review recommended"
+            $issues | ForEach-Object { Write-Host "::warning file=$($_.File)::$($_.Description)" }
+            Write-Host "Found $($issues.Count) potentially unsafe pattern(s)"
+            Write-Host "If these are intentional, add them to the allow-list in this workflow."
+            echo "has_issues=true" >> $env:GITHUB_OUTPUT
           } else {
             Write-Host "No unsafe patterns detected"
+            echo "has_issues=false" >> $env:GITHUB_OUTPUT
           }
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@7434149006143a4d75b82a2f411ef15b03ccc2d7 # v4
+        if: always()
+        with:
+          sarif_file: security-results.sarif
+          category: powershell-security
+        continue-on-error: true  # Don't fail if SARIF upload fails (e.g., on forks)

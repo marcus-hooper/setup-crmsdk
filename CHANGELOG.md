@@ -96,6 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security improvements or vulnerability fixes
 -->
 
-[Unreleased]: https://github.com/raas-dev/setup-crmsdk/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/raas-dev/setup-crmsdk/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/raas-dev/setup-crmsdk/releases/tag/v1.0.0
+[Unreleased]: https://github.com/marcus-hooper/setup-crmsdk/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/marcus-hooper/setup-crmsdk/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/marcus-hooper/setup-crmsdk/releases/tag/v1.0.0

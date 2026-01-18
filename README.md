@@ -13,7 +13,8 @@ A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_P
 
 ## Features
 
-- Installs the latest Microsoft.CrmSdk.CoreTools package
+- Installs Microsoft.CrmSdk.CoreTools package (latest or specific version)
+- Supports version pinning for reproducible builds
 - Sets `CRM_SDK_PATH` environment variable for subsequent workflow steps
 - Skips installation if SDK is already installed
 - Automatic cleanup of temporary files
@@ -24,6 +25,12 @@ A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_P
 - name: Setup CRM SDK
   uses: marcus-hooper/setup-crmsdk@v1
 ```
+
+## Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `version` | No | (latest) | Specific version of Microsoft.CrmSdk.CoreTools to install (e.g., `9.1.0.184`) |
 
 ## Usage
 
@@ -50,6 +57,15 @@ A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_P
 
 - name: Display SDK path
   run: echo "SDK installed at ${{ steps.crmsdk.outputs.sdk-path }}"
+```
+
+### Pinning a Specific Version
+
+```yaml
+- name: Setup CRM SDK
+  uses: marcus-hooper/setup-crmsdk@v1
+  with:
+    version: '9.1.0.184'
 ```
 
 ### Complete Workflow Example
@@ -122,14 +138,13 @@ Access tools using: `Join-Path $env:CRM_SDK_PATH "coretools\ToolName.exe"`
 - **Windows only** - Requires Windows runner; not compatible with Linux or macOS
 - **Network required** - Downloads NuGet CLI and packages at runtime
 - **Fixed install path** - Always installs to `$env:LOCALAPPDATA\Programs\`
-- **No version pinning** - Always installs the latest Microsoft.CrmSdk.CoreTools
 
 ## How It Works
 
 1. Checks if `CRM_SDK_PATH` is already set (skips installation if exists)
 2. Creates installation directory at `$env:LOCALAPPDATA\Programs\`
 3. Downloads NuGet CLI from `dist.nuget.org`
-4. Installs `Microsoft.CrmSdk.CoreTools` package via NuGet
+4. Installs `Microsoft.CrmSdk.CoreTools` package via NuGet (specific version if provided, otherwise latest)
 5. Locates `SolutionPackager.exe` and sets `CRM_SDK_PATH` to its directory
 6. Exports the path to `GITHUB_ENV` for subsequent workflow steps
 7. Cleans up the NuGet CLI

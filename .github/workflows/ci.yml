@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths-ignore:
@@ -202,7 +203,7 @@ jobs:
         uses: ./
 
       - name: Verify CRM_SDK_PATH is set
-        shell: powershell
+        shell: pwsh
         run: |
           if (-not $env:CRM_SDK_PATH) {
             Write-Host "::error::CRM_SDK_PATH environment variable is not set"
@@ -211,7 +212,7 @@ jobs:
           Write-Host "CRM_SDK_PATH is set to: $env:CRM_SDK_PATH"
 
       - name: Verify SolutionPackager exists
-        shell: powershell
+        shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
           if (-not (Test-Path $solutionPackager)) {

@@ -26,7 +26,7 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
-          egress-policy: audit
+          egress-policy: block
           allowed-endpoints: >
             api.github.com:443
             api.nuget.org:443
@@ -41,19 +41,17 @@ jobs:
           persist-credentials: false
 
       - name: Verify NuGet CLI is downloadable
+        timeout-minutes: 2
         shell: pwsh
         run: |
-          $response = Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -Method Head -UseBasicParsing
-          if ($response.StatusCode -ne 200) {
-            Write-Error "NuGet CLI endpoint returned status $($response.StatusCode)"
-            exit 1
-          }
+          $response = Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -Method Head -UseBasicParsing -ErrorAction Stop
           Write-Host "NuGet CLI endpoint is accessible (HTTP $($response.StatusCode))"
 
       - name: Verify CrmSdk package exists on NuGet
+        timeout-minutes: 2
         shell: pwsh
         run: |
-          $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.crmsdk.coretools/index.json" -UseBasicParsing
+          $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.crmsdk.coretools/index.json" -UseBasicParsing -ErrorAction Stop
           $latestVersion = $response.versions | Select-Object -Last 1
           Write-Host "Microsoft.CrmSdk.CoreTools is available on NuGet (latest: $latestVersion)"
 
@@ -61,7 +59,7 @@ jobs:
         uses: ./
 
       - name: Verify CRM_SDK_PATH is set
-        shell: powershell
+        shell: pwsh
         run: |
           if (-not $env:CRM_SDK_PATH) {
             Write-Host "::error::CRM_SDK_PATH environment variable is not set"
@@ -70,7 +68,7 @@ jobs:
           Write-Host "CRM_SDK_PATH is set to: $env:CRM_SDK_PATH"
 
       - name: Verify SolutionPackager exists
-        shell: powershell
+        shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
           if (-not (Test-Path $solutionPackager)) {
@@ -80,7 +78,7 @@ jobs:
           Write-Host "SolutionPackager.exe found at: $solutionPackager"
 
       - name: Verify SolutionPackager executes
-        shell: powershell
+        shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
           & $solutionPackager /? | Out-Null
@@ -93,7 +91,7 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery
+          $results = Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery -ErrorAction Stop
           $results | Format-Table -AutoSize
           if ($results) {
             Write-Error "PSScriptAnalyzer found $($results.Count) issue(s)"
@@ -145,6 +143,13 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
 
+      - name: Ensure health-check-failure label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create "health-check-failure" --description "Automated health check detected a failure" --color "d73a4a" --force
+
       - name: Create failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -157,24 +162,56 @@ jobs:
             echo "Existing issue #$EXISTING found, adding comment"
             gh issue comment "$EXISTING" --body "Health check failed again on $(date -u '+%Y-%m-%d %H:%M UTC').
 
-          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+[View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           else
             echo "Creating new failure issue"
             gh issue create \
               --title "Scheduled health check failed" \
-              --label "health-check-failure,bug" \
+              --label "health-check-failure,type:bug" \
               --body "The scheduled health check workflow failed on $(date -u '+%Y-%m-%d %H:%M UTC').
 
-          ## Details
-          - **Workflow:** ${{ github.workflow }}
-          - **Run ID:** ${{ github.run_id }}
-          - **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+## Details
+- **Workflow:** ${{ github.workflow }}
+- **Run ID:** ${{ github.run_id }}
+- **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          ## Possible Causes
-          - NuGet CLI endpoint unavailable
-          - Microsoft.CrmSdk.CoreTools package unavailable
-          - SolutionPackager.exe execution failure
-          - Test failures
+## Possible Causes
+- NuGet CLI endpoint unavailable
+- Microsoft.CrmSdk.CoreTools package unavailable
+- SolutionPackager.exe execution failure
+- Test failures
 
-          Please investigate and resolve the issue."
+Please investigate and resolve the issue."
           fi
+
+  # Auto-close failure issues when health check passes
+  notify-success:
+    name: Close Stale Failure Issues
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: success() && github.event_name == 'schedule'
+    timeout-minutes: 5
+
+    permissions:
+      issues: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Close stale failure issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh issue list --label "health-check-failure" --state open --json number --jq '.[].number' | while read -r issue; do
+            if [[ -n "$issue" ]]; then
+              echo "Closing issue #$issue"
+              gh issue close "$issue" --comment "Health check is passing again as of $(date -u '+%Y-%m-%d %H:%M UTC'). Closing automatically."
+            fi
+          done
+          echo "Done processing stale failure issues"

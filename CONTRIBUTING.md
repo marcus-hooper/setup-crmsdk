@@ -14,6 +14,12 @@ Thank you for your interest in contributing to setup-crmsdk!
 ```powershell
 git clone https://github.com/marcus-hooper/setup-crmsdk.git
 cd setup-crmsdk
+
+# Install latest version
+.\scripts\Install-CrmSdk.ps1
+
+# Or install a specific version
+$env:INPUT_VERSION = '9.1.0.184'
 .\scripts\Install-CrmSdk.ps1
 ```
 
@@ -140,7 +146,7 @@ All PRs must pass these checks before merge:
 | Lint | `Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery` | No errors |
 | Format | See format check in [Running CI Locally](#running-ci-locally) | No changes |
 | Tests | `Invoke-Pester -Path ./tests` | All pass |
-| Coverage | Collected automatically | 80%+ target (not enforced) |
+| Coverage | Collected automatically | Reported only (not enforced) |
 
 ### PR Description
 
@@ -159,6 +165,14 @@ Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md). Include:
 - Squash merge to `main`
 
 ## Test Requirements
+
+### CI Environments
+
+| Job | Runner | Notes |
+|-----|--------|-------|
+| Lint & Format | `ubuntu-latest` | PSScriptAnalyzer works cross-platform |
+| Unit Tests | `ubuntu-latest` | Pester tests with mocked dependencies |
+| Integration | `windows-latest` | Requires Windows for actual SDK installation |
 
 ### Running Tests
 
@@ -189,14 +203,17 @@ Tests are located in `tests/Install-CrmSdk.Tests.ps1`. See existing tests for pa
 ### Project-Specific Guidelines
 
 ```powershell
-# Use Test-Path for environment variable checks (not $env:VAR -ne $null)
+# Use Test-Path for existence checks, $env:VAR for truthy checks
 if (Test-Path env:CRM_SDK_PATH) {
-    # Variable exists
+    # Variable exists (even if empty)
+}
+if ($env:CI) {
+    # Variable is set and non-empty (truthy)
 }
 
-# Mock external dependencies in tests (Invoke-WebRequest, nuget.exe)
-Mock Invoke-WebRequest { }
-Mock nuget.exe { return 0 }
+# Mock external dependencies in tests (use -ModuleName for module-scoped mocks)
+Mock Invoke-WebRequest { } -ModuleName Install-CrmSdk
+Mock Invoke-NuGetInstall { return 0 } -ModuleName Install-CrmSdk
 ```
 
 ### PowerShell Best Practices
@@ -219,10 +236,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "NuGet install failed"
 }
 
-# Use Test-Path for environment variable checks
-if (Test-Path env:CRM_SDK_PATH) {
-    # Variable exists
-}
+# Environment variable checks: existence vs truthy
+if (Test-Path env:CRM_SDK_PATH) { }  # Exists (even if empty)
+if ($env:CI) { }                      # Truthy (set and non-empty)
 
 # Add SupportsShouldProcess for state-changing functions
 function Set-Something {

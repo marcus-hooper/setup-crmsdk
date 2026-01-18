@@ -104,10 +104,6 @@
   description: "Pull requests that update a dependency file"
   color: "0366D6"
 
-- name: "github_actions"
-  description: "Dependabot GitHub Actions ecosystem"
-  color: "000000"
-
 - name: "github-actions"
   description: "GitHub Actions workflow updates"
   color: "2088FF"
@@ -123,8 +119,4 @@
 # Automated
 - name: "health-check-failure"
   description: "Automated issue from failed scheduled health check"
-  color: "D73A4A"
-
-- name: "bug"
-  description: "Something isn't working"
   color: "D73A4A"

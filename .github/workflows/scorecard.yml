@@ -21,6 +21,7 @@ permissions: {}
 jobs:
   # Job 1: Run Scorecard and publish to OpenSSF (requires uses-only steps)
   analysis:
+    if: github.repository == 'DIGITALLNature/setup-crmsdk'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -69,6 +70,7 @@ jobs:
 
   # Job 2: Process SARIF and upload to GitHub Code Scanning (allows run steps)
   upload:
+    if: always() && needs.analysis.result == 'success'
     runs-on: ubuntu-latest
     needs: analysis
     timeout-minutes: 5
@@ -96,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           # Add a summary note to the first SARIF run's invocations to describe what Scorecard evaluated.
-          jq '.runs[0].invocations = [{"executionSuccessful": true, "toolExecutionNotifications": [{"level": "note", "message": {"text": "Scorecard evaluated repository security posture across 18 checks including branch protection, dependency management, CI/CD security, and vulnerability disclosure."}, "descriptor": {"id": "scanned-files-summary"}}]}]' \
+          jq '.runs[0].invocations = [{"executionSuccessful": true, "toolExecutionNotifications": [{"level": "note", "message": {"text": "Scorecard evaluated repository security posture across multiple checks including branch protection, dependency management, CI/CD security, and vulnerability disclosure."}, "descriptor": {"id": "scanned-files-summary"}}]}]' \
             results.sarif > results.tmp
           mv results.tmp results.sarif
 
@@ -104,3 +106,4 @@ jobs:
         uses: github/codeql-action/upload-sarif@7434149006143a4d75b82a2f411ef15b03ccc2d7 # v4
         with:
           sarif_file: results.sarif
+          category: scorecard

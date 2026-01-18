@@ -116,10 +116,18 @@ function Invoke-NuGetInstall {
         [string]$PackageName,
 
         [Parameter(Mandatory)]
-        [string]$OutputDirectory
+        [string]$OutputDirectory,
+
+        [Parameter()]
+        [string]$Version
     )
 
-    & $NuGetPath install $PackageName -OutputDirectory $OutputDirectory | Write-Host
+    $nugetArgs = @('install', $PackageName, '-OutputDirectory', $OutputDirectory)
+    if ($Version) {
+        $nugetArgs += @('-Version', $Version)
+    }
+
+    & $NuGetPath @nugetArgs | Write-Host
     return $LASTEXITCODE
 }
 
@@ -136,15 +144,32 @@ function Install-CrmSdkPackage {
         [string]$NuGetPath,
 
         [Parameter(Mandatory)]
-        [string]$InstallPath
+        [string]$InstallPath,
+
+        [Parameter()]
+        [string]$Version
     )
 
-    Write-Message 'Installing Microsoft.CrmSdk.CoreTools package.'
+    if ($Version) {
+        Write-Message "Installing Microsoft.CrmSdk.CoreTools version $Version."
+    }
+    else {
+        Write-Message 'Installing Microsoft.CrmSdk.CoreTools package (latest version).'
+    }
 
     try {
         Push-Location $InstallPath
 
-        $exitCode = Invoke-NuGetInstall -NuGetPath $NuGetPath -PackageName 'Microsoft.CrmSdk.CoreTools' -OutputDirectory $InstallPath
+        $installParams = @{
+            NuGetPath       = $NuGetPath
+            PackageName     = 'Microsoft.CrmSdk.CoreTools'
+            OutputDirectory = $InstallPath
+        }
+        if ($Version) {
+            $installParams['Version'] = $Version
+        }
+
+        $exitCode = Invoke-NuGetInstall @installParams
         if ($exitCode -ne 0) {
             throw 'NuGet install command failed with exit code {0}' -f $exitCode
         }
@@ -189,13 +214,21 @@ function Install-CrmSdk {
     .DESCRIPTION
         Downloads NuGet CLI, installs Microsoft.CrmSdk.CoreTools package,
         locates SolutionPackager.exe, and sets CRM_SDK_PATH.
+    .PARAMETER InstallPath
+        The directory where the SDK will be installed. Defaults to $env:LOCALAPPDATA\Programs.
+    .PARAMETER Version
+        The specific version of Microsoft.CrmSdk.CoreTools to install.
+        If not specified, installs the latest version.
     .OUTPUTS
         The path to the installed CRM SDK, or the existing path if already installed.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter()]
-        [string]$InstallPath = "$env:LOCALAPPDATA\Programs"
+        [string]$InstallPath = "$env:LOCALAPPDATA\Programs",
+
+        [Parameter()]
+        [string]$Version
     )
 
     # Check if already installed
@@ -218,7 +251,14 @@ function Install-CrmSdk {
         $nugetPath = Get-NuGetCli -DestinationPath $InstallPath
 
         # Install the CRM SDK package
-        $sdkPath = Install-CrmSdkPackage -NuGetPath $nugetPath -InstallPath $InstallPath
+        $packageParams = @{
+            NuGetPath   = $nugetPath
+            InstallPath = $InstallPath
+        }
+        if ($Version) {
+            $packageParams['Version'] = $Version
+        }
+        $sdkPath = Install-CrmSdkPackage @packageParams
 
         # Set the environment variable
         Set-CrmSdkEnvironmentVariable -Name 'CRM_SDK_PATH' -Value $sdkPath
