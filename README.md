@@ -2,8 +2,11 @@
 
 [![CI](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/marcus-hooper/setup-crmsdk/graph/badge.svg)](https://codecov.io/gh/marcus-hooper/setup-crmsdk)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://securityscorecards.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
+[![GitHub release](https://img.shields.io/github/v/release/marcus-hooper/setup-crmsdk)](https://github.com/marcus-hooper/setup-crmsdk/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
+[![CodeQL](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://scorecard.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
 
 A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_PATH` environment variable for use in CI/CD workflows.
 
@@ -174,7 +177,7 @@ Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery
 
 ```powershell
 # Check formatting (CI runs this automatically)
-Get-ChildItem -Path ./scripts -Filter *.ps1 -Recurse | ForEach-Object {
+Get-ChildItem -Path ./scripts -Include *.ps1,*.psm1 -Recurse | ForEach-Object {
     $original = Get-Content -Path $_.FullName -Raw
     $formatted = Invoke-Formatter -ScriptDefinition $original
     if ($original -ne $formatted) {
@@ -200,14 +203,17 @@ Invoke-Pester -Path ./tests -Output Detailed
 setup-crmsdk/
 ├── action.yml                  # GitHub Action definition (composite action)
 ├── scripts/
-│   ├── Install-CrmSdk.ps1      # Main PowerShell installation script
-│   └── Install-CrmSdk.psm1     # PowerShell module for testing
+│   ├── Install-CrmSdk.ps1      # Entry point script
+│   └── Install-CrmSdk.psm1     # PowerShell module with testable functions
 ├── tests/                      # Pester unit tests
 ├── .github/
 │   ├── dependabot.yml          # Dependabot configuration
+│   ├── labels.yml              # Repository label definitions
+│   ├── PULL_REQUEST_TEMPLATE.md  # PR template
 │   ├── ISSUE_TEMPLATE/         # Issue templates
 │   └── workflows/
-│       ├── ci.yml              # CI workflow (lint + test + coverage)
+│       ├── ci.yml              # CI workflow (lint, format, test, integration)
+│       ├── codeql.yml          # CodeQL security analysis
 │       ├── dependabot-automerge.yml  # Auto-merge Dependabot PRs
 │       ├── labels.yml          # Label synchronization
 │       ├── release.yml         # Release management
@@ -215,21 +221,25 @@ setup-crmsdk/
 │       ├── scorecard.yml       # OpenSSF Scorecard analysis
 │       ├── security.yml        # Security scanning
 │       └── validate.yml        # Action validation
+├── .gitignore                  # Git ignore patterns
 ├── README.md                   # This file
 ├── LICENSE                     # MIT License
 ├── CHANGELOG.md                # Version history
+├── CONTRIBUTING.md             # Contribution guidelines
 └── SECURITY.md                 # Security policy
 ```
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+Quick start:
 
 1. Check existing [issues](https://github.com/marcus-hooper/setup-crmsdk/issues) or open a new one
 2. Fork the repository
 3. Create a feature branch (`git checkout -b feature/my-feature`)
 4. Make your changes and add tests if applicable
-5. Ensure CI passes (lint and test)
+5. Ensure CI passes (lint, format, and test)
 6. Submit a pull request
 
 See the issue templates for [bug reports](.github/ISSUE_TEMPLATE/bug_report.md) and [feature requests](.github/ISSUE_TEMPLATE/feature_request.md).
