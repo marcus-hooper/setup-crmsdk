@@ -58,24 +58,21 @@ jobs:
       - name: Install action-validator
         env:
           # Pin to specific version for reproducibility
-          ACTION_VALIDATOR_VERSION: "v0.6.0"
+          ACTION_VALIDATOR_VERSION: "v0.8.0"
+          # SHA256 checksum of action-validator_linux_amd64 (upstream doesn't provide checksums.txt)
+          ACTION_VALIDATOR_SHA256: "d1d9b787b897c6f8ef9e2f42c2553ce5d0a242aae3bca998d2c67dc69348b128"
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.local/bin"
           DOWNLOAD_URL="https://github.com/mpalmer/action-validator/releases/download/${ACTION_VALIDATOR_VERSION}/action-validator_linux_amd64"
-          CHECKSUMS_URL="https://github.com/mpalmer/action-validator/releases/download/${ACTION_VALIDATOR_VERSION}/checksums.txt"
 
-          # Download binary and checksums
-          curl -sL "$DOWNLOAD_URL" -o "$HOME/.local/bin/action-validator"
-          curl -sL "$CHECKSUMS_URL" -o /tmp/checksums.txt
+          curl -fsSL "$DOWNLOAD_URL" -o "$HOME/.local/bin/action-validator"
 
           # Verify checksum
-          EXPECTED_CHECKSUM=$(grep "action-validator_linux_amd64" /tmp/checksums.txt | awk '{print $1}')
           ACTUAL_CHECKSUM=$(sha256sum "$HOME/.local/bin/action-validator" | awk '{print $1}')
-
-          if [[ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]]; then
+          if [[ "$ACTION_VALIDATOR_SHA256" != "$ACTUAL_CHECKSUM" ]]; then
             echo "::error::Checksum verification failed!"
-            echo "Expected: $EXPECTED_CHECKSUM"
+            echo "Expected: $ACTION_VALIDATOR_SHA256"
             echo "Actual: $ACTUAL_CHECKSUM"
             exit 1
           fi
