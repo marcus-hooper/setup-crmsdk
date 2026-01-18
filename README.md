@@ -210,7 +210,10 @@ setup-crmsdk/
 │   ├── dependabot.yml          # Dependabot configuration
 │   ├── labels.yml              # Repository label definitions
 │   ├── PULL_REQUEST_TEMPLATE.md  # PR template
-│   ├── ISSUE_TEMPLATE/         # Issue templates
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.yml      # Bug report form
+│   │   ├── feature_request.yml # Feature request form
+│   │   └── config.yml          # Issue template chooser config
 │   └── workflows/
 │       ├── ci.yml              # CI workflow (lint, format, test, integration)
 │       ├── codeql.yml          # CodeQL security analysis
