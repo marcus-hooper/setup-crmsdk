@@ -6,11 +6,13 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.github/*.md'
   pull_request:
     branches: [main]
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.github/*.md'
   schedule:
     - cron: '0 6 * * 3'  # Weekly on Wednesday 6am UTC
 
@@ -36,16 +38,20 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.7.1
         with:
+          config-file: .github/dependency-review-config.yml
           fail-on-severity: high
           comment-summary-in-pr: always
 
@@ -62,10 +68,13 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 

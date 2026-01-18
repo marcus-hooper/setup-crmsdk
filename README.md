@@ -7,6 +7,7 @@
 [![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
 [![CodeQL](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://scorecard.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
+[![Security](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/security.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/security.yml)
 
 A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_PATH` environment variable for use in CI/CD workflows.
 
@@ -116,6 +117,13 @@ Access tools using: `Join-Path $env:CRM_SDK_PATH "coretools\ToolName.exe"`
 - Windows runner (`runs-on: windows-latest`)
 - Internet access to download NuGet packages
 
+## Limitations
+
+- **Windows only** - Requires Windows runner; not compatible with Linux or macOS
+- **Network required** - Downloads NuGet CLI and packages at runtime
+- **Fixed install path** - Always installs to `$env:LOCALAPPDATA\Programs\`
+- **No version pinning** - Always installs the latest Microsoft.CrmSdk.CoreTools
+
 ## How It Works
 
 1. Checks if `CRM_SDK_PATH` is already set (skips installation if exists)
@@ -125,6 +133,27 @@ Access tools using: `Join-Path $env:CRM_SDK_PATH "coretools\ToolName.exe"`
 5. Locates `SolutionPackager.exe` and sets `CRM_SDK_PATH` to its directory
 6. Exports the path to `GITHUB_ENV` for subsequent workflow steps
 7. Cleans up the NuGet CLI
+
+## Sample Output
+
+When the action runs successfully, you'll see output similar to:
+
+```
+[INFO] Checking for existing CRM SDK installation...
+[INFO] Downloading NuGet CLI...
+[INFO] Installing Microsoft.CrmSdk.CoreTools...
+[INFO] Package installed successfully
+[INFO] Setting CRM_SDK_PATH to C:\Users\runneradmin\AppData\Local\Programs\Microsoft.CrmSdk.CoreTools.9.1.x\content\bin\coretools
+[INFO] SDK installation complete
+```
+
+When the SDK is already installed:
+
+```
+[INFO] Checking for existing CRM SDK installation...
+[INFO] CRM SDK is already installed at C:\Users\runneradmin\AppData\Local\Programs\Microsoft.CrmSdk.CoreTools.9.1.x\content\bin\coretools
+[INFO] Skipping installation
+```
 
 ## Troubleshooting
 
@@ -207,26 +236,8 @@ setup-crmsdk/
 │   └── Install-CrmSdk.psm1     # PowerShell module with testable functions
 ├── tests/                      # Pester unit tests
 ├── .github/
-│   ├── dependabot.yml          # Dependabot configuration
-│   ├── labels.yml              # Repository label definitions
-│   ├── PULL_REQUEST_TEMPLATE.md  # PR template
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.yml      # Bug report form
-│   │   ├── feature_request.yml # Feature request form
-│   │   └── config.yml          # Issue template chooser config
-│   └── workflows/
-│       ├── ci.yml              # CI workflow (lint, format, test, integration)
-│       ├── codeql.yml          # CodeQL security analysis
-│       ├── dependabot-automerge.yml  # Auto-merge Dependabot PRs
-│       ├── labels.yml          # Label synchronization
-│       ├── release.yml         # Release management
-│       ├── schedule.yml        # Scheduled health checks
-│       ├── scorecard.yml       # OpenSSF Scorecard analysis
-│       ├── security.yml        # Security scanning
-│       └── validate.yml        # Action validation
-├── .gitignore                  # Git ignore patterns
-├── README.md                   # This file
-├── LICENSE                     # MIT License
+│   ├── ISSUE_TEMPLATE/         # Bug report and feature request forms
+│   └── workflows/              # CI, CodeQL, security, release workflows
 ├── CHANGELOG.md                # Version history
 ├── CONTRIBUTING.md             # Contribution guidelines
 └── SECURITY.md                 # Security policy
@@ -245,7 +256,13 @@ Quick start:
 5. Ensure CI passes (lint, format, and test)
 6. Submit a pull request
 
-See the issue templates for [bug reports](.github/ISSUE_TEMPLATE/bug_report.md) and [feature requests](.github/ISSUE_TEMPLATE/feature_request.md).
+See the issue templates for [bug reports](.github/ISSUE_TEMPLATE/bug_report.yml) and [feature requests](.github/ISSUE_TEMPLATE/feature_request.yml).
+
+## Related Projects
+
+- [Microsoft.CrmSdk.CoreTools](https://www.nuget.org/packages/Microsoft.CrmSdk.CoreTools) - The NuGet package this action installs
+- [Microsoft Power Platform CLI](https://learn.microsoft.com/en-us/power-platform/developer/cli/introduction) - Modern CLI alternative (pac CLI)
+- [Power Platform Actions](https://github.com/microsoft/powerplatform-actions) - Official Microsoft GitHub Actions for Power Platform
 
 ## Security
 

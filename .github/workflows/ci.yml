@@ -7,6 +7,7 @@ on:
       - '**.md'
       - 'docs/**'
       - '.github/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE'
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - '**.md'
       - 'docs/**'
       - '.github/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE'
 
 concurrency:
@@ -39,7 +41,7 @@ jobs:
             github.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -56,8 +58,8 @@ jobs:
           fi
           echo "CHANGELOG.md format valid"
 
-  lint:
-    name: PSScriptAnalyzer
+  lint-and-format:
+    name: Lint & Format Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -71,7 +73,7 @@ jobs:
             github.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -86,38 +88,11 @@ jobs:
           }
           Write-Host "No issues found"
 
-  format-check:
-    name: Format Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
-        with:
-          egress-policy: block
-          allowed-endpoints: >
-            api.github.com:443
-            github.com:443
-
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          persist-credentials: false
-
       - name: Check PowerShell formatting
         shell: pwsh
         run: |
           $hasErrors = $false
-          Get-ChildItem -Path ./scripts -Filter *.ps1 -Recurse | ForEach-Object {
-            $original = Get-Content -Path $_.FullName -Raw
-            $formatted = Invoke-Formatter -ScriptDefinition $original
-            if ($original -ne $formatted) {
-              Write-Host "::error file=$($_.FullName)::File is not properly formatted"
-              $hasErrors = $true
-            }
-          }
-          Get-ChildItem -Path ./scripts -Filter *.psm1 -Recurse | ForEach-Object {
+          Get-ChildItem -Path ./scripts -Include '*.ps1', '*.psm1' -Recurse | ForEach-Object {
             $original = Get-Content -Path $_.FullName -Raw
             $formatted = Invoke-Formatter -ScriptDefinition $original
             if ($original -ne $formatted) {
@@ -151,7 +126,7 @@ jobs:
             uploader.codecov.io:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -183,7 +158,7 @@ jobs:
           }
 
       - name: Upload test results
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: test-results
@@ -207,9 +182,19 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # harden-runner only supports Linux; skip on Windows
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            api.nuget.org:443
+            azureedge.net:443
+            dist.nuget.org:443
+            github.com:443
+
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -234,3 +219,27 @@ jobs:
             exit 1
           }
           Write-Host "SolutionPackager.exe found at: $solutionPackager"
+
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [validate-changelog, lint-and-format, unit-test, integration-test]
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: ""
+
+      - name: Check CI status
+        run: |
+          if [[ "${{ needs.validate-changelog.result }}" != "success" ]] || \
+             [[ "${{ needs.lint-and-format.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-test.result }}" != "success" ]] || \
+             [[ "${{ needs.integration-test.result }}" != "success" ]]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          echo "All CI jobs passed successfully"

@@ -23,9 +23,20 @@ jobs:
       contents: read
 
     steps:
-      # harden-runner only supports Linux; skip on Windows
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+          allowed-endpoints: >
+            api.github.com:443
+            api.nuget.org:443
+            azureedge.net:443
+            dist.nuget.org:443
+            github.com:443
+            www.powershellgallery.com:443
+
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -82,7 +93,6 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
           $results = Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery
           $results | Format-Table -AutoSize
           if ($results) {
@@ -99,7 +109,72 @@ jobs:
             $config.Run.Path = './tests'
             $config.Output.Verbosity = 'Detailed'
             $config.Run.Exit = $true
+            $config.TestResult.Enabled = $true
+            $config.TestResult.OutputPath = 'test-results.xml'
+            $config.TestResult.OutputFormat = 'NUnitXml'
             Invoke-Pester -Configuration $config
           } else {
             Write-Host "No tests directory found - skipping"
           }
+
+      - name: Upload test results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: health-check-test-results
+          path: test-results.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Notify on failure by creating a GitHub issue
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: failure() && github.event_name == 'schedule'
+    timeout-minutes: 5
+
+    permissions:
+      issues: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Create failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Check for existing open issue to avoid duplicates
+          EXISTING=$(gh issue list --label "health-check-failure" --state open --json number --jq '.[0].number // empty')
+
+          if [[ -n "$EXISTING" ]]; then
+            echo "Existing issue #$EXISTING found, adding comment"
+            gh issue comment "$EXISTING" --body "Health check failed again on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          else
+            echo "Creating new failure issue"
+            gh issue create \
+              --title "Scheduled health check failed" \
+              --label "health-check-failure,bug" \
+              --body "The scheduled health check workflow failed on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          ## Details
+          - **Workflow:** ${{ github.workflow }}
+          - **Run ID:** ${{ github.run_id }}
+          - **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          ## Possible Causes
+          - NuGet CLI endpoint unavailable
+          - Microsoft.CrmSdk.CoreTools package unavailable
+          - SolutionPackager.exe execution failure
+          - Test failures
+
+          Please investigate and resolve the issue."
+          fi

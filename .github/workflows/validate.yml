@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "action.yml"
+      - "CODEOWNERS"
+      - ".github/CODEOWNERS"
       - ".github/workflows/validate.yml"
   pull_request:
     branches: [main]
     paths:
       - "action.yml"
+      - "CODEOWNERS"
+      - ".github/CODEOWNERS"
       - ".github/workflows/validate.yml"
   workflow_dispatch:
 
@@ -36,11 +40,10 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
             github.com:443
-            github-releases.githubusercontent.com:443
             objects.githubusercontent.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
@@ -51,10 +54,31 @@ jobs:
           echo "YAML syntax is valid"
 
       - name: Install action-validator
+        env:
+          # Pin to specific version for reproducibility
+          ACTION_VALIDATOR_VERSION: "v0.6.0"
         run: |
+          set -euo pipefail
           mkdir -p "$HOME/.local/bin"
-          curl -sL https://github.com/mpalmer/action-validator/releases/latest/download/action-validator_linux_amd64 \
-            -o "$HOME/.local/bin/action-validator"
+          DOWNLOAD_URL="https://github.com/mpalmer/action-validator/releases/download/${ACTION_VALIDATOR_VERSION}/action-validator_linux_amd64"
+          CHECKSUMS_URL="https://github.com/mpalmer/action-validator/releases/download/${ACTION_VALIDATOR_VERSION}/checksums.txt"
+
+          # Download binary and checksums
+          curl -sL "$DOWNLOAD_URL" -o "$HOME/.local/bin/action-validator"
+          curl -sL "$CHECKSUMS_URL" -o /tmp/checksums.txt
+
+          # Verify checksum
+          EXPECTED_CHECKSUM=$(grep "action-validator_linux_amd64" /tmp/checksums.txt | awk '{print $1}')
+          ACTUAL_CHECKSUM=$(sha256sum "$HOME/.local/bin/action-validator" | awk '{print $1}')
+
+          if [[ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]]; then
+            echo "::error::Checksum verification failed!"
+            echo "Expected: $EXPECTED_CHECKSUM"
+            echo "Actual: $ACTUAL_CHECKSUM"
+            exit 1
+          fi
+
+          echo "Checksum verified: $ACTUAL_CHECKSUM"
           chmod +x "$HOME/.local/bin/action-validator"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -116,3 +140,41 @@ jobs:
           else
             echo "No branding configuration found (optional)"
           fi
+
+      - name: Validate CODEOWNERS (if present)
+        run: |
+          # Find CODEOWNERS file (can be in root, .github/, or docs/)
+          CODEOWNERS_FILE=""
+          for path in "CODEOWNERS" ".github/CODEOWNERS" "docs/CODEOWNERS"; do
+            if [[ -f "$path" ]]; then
+              CODEOWNERS_FILE="$path"
+              break
+            fi
+          done
+
+          if [[ -z "$CODEOWNERS_FILE" ]]; then
+            echo "::notice::No CODEOWNERS file found. Consider adding one for code review assignments."
+            exit 0
+          fi
+
+          echo "Validating $CODEOWNERS_FILE..."
+          ERRORS=0
+
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip empty lines and comments
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+            # Check for valid pattern + owner format
+            # Pattern should be followed by at least one owner (@user, @org/team, or email)
+            if ! echo "$line" | grep -qE '^[^@#]+\s+(@[a-zA-Z0-9_/-]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)'; then
+              echo "::error file=$CODEOWNERS_FILE::Invalid line: $line"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < "$CODEOWNERS_FILE"
+
+          if [[ $ERRORS -gt 0 ]]; then
+            echo "::error::Found $ERRORS error(s) in CODEOWNERS"
+            exit 1
+          fi
+
+          echo "CODEOWNERS syntax is valid"

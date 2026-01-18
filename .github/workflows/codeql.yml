@@ -1,20 +1,24 @@
+# CodeQL Security Analysis
+#
+# Scope: Analyzes GitHub Actions workflow files (YAML) only.
+# Note: PowerShell scripts are NOT analyzed by CodeQL (unsupported language).
+#       PowerShell security is handled by PSScriptAnalyzer (ci.yml) and
+#       custom security checks (security.yml).
+
 name: CodeQL
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - '**.yml'
       - '**.yaml'
-      - '**.js'
-      - '**.ts'
   pull_request:
     branches: [main]
     paths:
       - '**.yml'
       - '**.yaml'
-      - '**.js'
-      - '**.ts'
   schedule:
     - cron: '0 6 * * 1'  # Weekly on Monday 6am UTC
 
@@ -38,16 +42,21 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            uploads.github.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
 
-      # CodeQL doesn't natively support PowerShell, but can analyze:
-      # - GitHub Actions workflows (YAML) for security issues
-      # - Any JavaScript/TypeScript if added in the future
+      # Scope: This workflow only analyzes GitHub Actions workflows (YAML files).
+      # CodeQL does not support PowerShell - PowerShell scripts are analyzed by:
+      # - PSScriptAnalyzer in ci.yml (lint and security rules)
+      # - Custom security checks in security.yml (hardcoded secrets, unsafe patterns)
       - name: Initialize CodeQL
         uses: github/codeql-action/init@7434149006143a4d75b82a2f411ef15b03ccc2d7 # v4
         with:

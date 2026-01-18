@@ -29,11 +29,19 @@ out/
 # Test results
 test-results.xml
 coverage.xml
+coverage/
 TestResults/
 
 # NuGet
 *.nupkg
 nuget.exe
+packages/
 
 # OS files
 .DS_Store
+
+# Logs
+*.log
+
+# Merge artifacts
+*.orig

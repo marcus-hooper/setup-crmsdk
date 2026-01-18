@@ -4,7 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| latest  | :white_check_mark: |
+| 1.x     | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -13,7 +13,7 @@ If you discover a security vulnerability in this project, please report it respo
 ### How to Report
 
 1. **Do not** open a public GitHub issue for security vulnerabilities
-2. Use GitHub's private vulnerability reporting feature to submit a report
+2. Use [GitHub's private vulnerability reporting](https://github.com/marcus-hooper/setup-crmsdk/security/advisories/new) to submit a report
 3. Include as much detail as possible:
    - Description of the vulnerability
    - Steps to reproduce
@@ -47,7 +47,7 @@ Out of scope:
 
 Security fixes are announced via:
 
-- GitHub Security Advisories
+- [GitHub Security Advisories](https://github.com/marcus-hooper/setup-crmsdk/security/advisories)
 - Release notes for patched versions
 
 Dependencies are monitored automatically via Dependabot.
@@ -67,3 +67,12 @@ This action performs the following operations that have security implications:
 2. **Review workflow permissions** - Grant only necessary permissions to your workflow
 3. **Verify the SDK path** - The action outputs `sdk-path` which can be validated in subsequent steps
 4. **Use in isolated runners** - Consider using ephemeral runners for sensitive pipelines
+
+### Data Handling
+
+This action:
+
+- Does **not** transmit any data to external services (beyond NuGet.org for package download)
+- Does **not** collect or store telemetry
+- Does **not** access or modify files outside the installation directory
+- Cleans up downloaded NuGet CLI after installation

@@ -1,6 +1,7 @@
 name: Bug Report
 description: Report a bug or unexpected behavior
-labels: ["bug"]
+title: "[Bug]: "
+labels: ["type:bug", "priority:medium"]
 body:
   - type: markdown
     attributes:
@@ -33,6 +34,7 @@ body:
     attributes:
       label: Expected Behavior
       description: What did you expect to happen?
+      placeholder: What should have happened?
     validations:
       required: true
 
@@ -69,15 +71,12 @@ body:
     validations:
       required: true
 
-  - type: dropdown
+  - type: input
     id: version
     attributes:
       label: Action Version
       description: Which version of the action are you using?
-      options:
-        - v1 (latest)
-        - main branch
-        - Specific SHA
+      placeholder: "v1, main, or specific SHA"
     validations:
       required: true
 

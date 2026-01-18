@@ -22,6 +22,7 @@
 - [ ] Documentation update
 - [ ] Refactoring (no functional changes)
 - [ ] CI/CD changes
+- [ ] Dependency update
 
 ## Testing
 
@@ -38,4 +39,11 @@
 - [ ] I have run `Invoke-Formatter` and code is properly formatted
 - [ ] All new and existing tests pass
 - [ ] I have updated documentation if needed
+- [ ] I have updated README.md if `action.yml` inputs/outputs changed
 - [ ] I have updated CHANGELOG.md under `[Unreleased]`
+- [ ] I have checked for breaking changes and documented them
+- [ ] Commit messages use conventional prefixes (`fix:`, `feat:`, `docs:`, etc.)
+
+## Screenshots / Output
+
+<!-- If applicable, add screenshots or command output -->
