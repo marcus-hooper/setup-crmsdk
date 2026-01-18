@@ -160,28 +160,32 @@ jobs:
 
           if [[ -n "$EXISTING" ]]; then
             echo "Existing issue #$EXISTING found, adding comment"
-            gh issue comment "$EXISTING" --body "Health check failed again on $(date -u '+%Y-%m-%d %H:%M UTC').
-
-[View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            gh issue comment "$EXISTING" --body "Health check failed again on $(date -u '+%Y-%m-%d %H:%M UTC'). [View workflow run]($RUN_URL)"
           else
             echo "Creating new failure issue"
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            ISSUE_BODY=$(cat <<EOF
+          The scheduled health check workflow failed on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          ## Details
+          - **Workflow:** ${{ github.workflow }}
+          - **Run ID:** ${{ github.run_id }}
+          - **Run URL:** $RUN_URL
+
+          ## Possible Causes
+          - NuGet CLI endpoint unavailable
+          - Microsoft.CrmSdk.CoreTools package unavailable
+          - SolutionPackager.exe execution failure
+          - Test failures
+
+          Please investigate and resolve the issue.
+          EOF
+          )
             gh issue create \
               --title "Scheduled health check failed" \
               --label "health-check-failure,type:bug" \
-              --body "The scheduled health check workflow failed on $(date -u '+%Y-%m-%d %H:%M UTC').
-
-## Details
-- **Workflow:** ${{ github.workflow }}
-- **Run ID:** ${{ github.run_id }}
-- **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-## Possible Causes
-- NuGet CLI endpoint unavailable
-- Microsoft.CrmSdk.CoreTools package unavailable
-- SolutionPackager.exe execution failure
-- Test failures
-
-Please investigate and resolve the issue."
+              --body "$ISSUE_BODY"
           fi
 
   # Auto-close failure issues when health check passes
