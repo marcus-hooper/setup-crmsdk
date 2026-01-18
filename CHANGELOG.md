@@ -5,10 +5,11 @@ All notable changes to setup-crmsdk are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-01-18
 
 ### Added
 
+- `version` input parameter for installing specific CRM SDK versions
 - Dependency review configuration file with license allow-list
 - New issue labels: `type:test`, `priority:critical`, `status:needs-design`, `status:in-progress`, `area:powershell`, `area:action`, `area:ci`
 - Security vulnerability reporting link in issue template config
@@ -96,6 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security improvements or vulnerability fixes
 -->
 
-[Unreleased]: https://github.com/marcus-hooper/setup-crmsdk/compare/v1.1.0...HEAD
+[1.2.0]: https://github.com/marcus-hooper/setup-crmsdk/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/marcus-hooper/setup-crmsdk/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/marcus-hooper/setup-crmsdk/releases/tag/v1.0.0
