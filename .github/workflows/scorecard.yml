@@ -21,7 +21,7 @@ permissions: {}
 jobs:
   # Job 1: Run Scorecard and publish to OpenSSF (requires uses-only steps)
   analysis:
-    if: github.repository == 'DIGITALLNature/setup-crmsdk'
+    if: github.repository == 'marcus-hooper/setup-crmsdk'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
