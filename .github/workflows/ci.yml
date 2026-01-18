@@ -147,6 +147,7 @@ jobs:
             codecov.io:443
             github.com:443
             ingest.codecov.io:443
+            storage.googleapis.com:443
             uploader.codecov.io:443
 
       - name: Checkout repository
@@ -164,7 +165,7 @@ jobs:
           $config.TestResult.OutputPath = 'test-results.xml'
           $config.TestResult.OutputFormat = 'NUnitXml'
           $config.CodeCoverage.Enabled = $true
-          $config.CodeCoverage.Path = './scripts/Install-CrmSdk.ps1'
+          $config.CodeCoverage.Path = @('./scripts/Install-CrmSdk.ps1', './scripts/Install-CrmSdk.psm1')
           $config.CodeCoverage.OutputPath = 'coverage.xml'
           $config.CodeCoverage.OutputFormat = 'JaCoCo'
 
