@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Switched Pester test results to JUnit format for better CI reporting
+- Replaced heredoc syntax with single-quoted strings in workflows for Windows compatibility
+- Enhanced bug report issue template with additional form fields
+- Expanded Dependabot configuration with grouped updates
+- Improved workflow configurations (ci, codeql, dependabot-automerge, release, schedule, security)
+
+### Fixed
+
+- Pester test reporter configuration in CI workflow
+- Security scanner allow-list in security workflow
+- Changelog reference link
+
+### Security
+
+- Updated github/codeql-action in the github-actions group
+
 ## [1.2.0] - 2026-01-18
 
 ### Added
