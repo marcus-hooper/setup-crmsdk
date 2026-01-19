@@ -26,5 +26,5 @@ updates:
       - "dependencies"
       - "github-actions"
     commit-message:
-      prefix: "ci"
+      prefix: "chore(ci)"
       include: "scope"
