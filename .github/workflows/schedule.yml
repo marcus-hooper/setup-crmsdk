@@ -41,7 +41,7 @@ jobs:
             www.powershellgallery.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -106,6 +106,7 @@ jobs:
 
       - name: Run PSScriptAnalyzer
         id: lint
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $results = Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery -ErrorAction Stop
@@ -169,7 +170,7 @@ jobs:
     name: Notify on Failure
     runs-on: ubuntu-latest
     needs: health-check
-    if: failure() && github.event_name == 'schedule' || failure() && github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation
+    if: failure() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation))
     timeout-minutes: 5
 
     permissions:
@@ -183,48 +184,46 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
 
-      - name: Ensure health-check-failure label exists
+      - name: Ensure status:health-check-failure label exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh label create "health-check-failure" --description "Automated health check detected a failure" --color "d73a4a" --force
+          gh label create "status:health-check-failure" --description "Automated health check detected a failure" --color "d73a4a" --force
 
       - name: Create failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE_BODY: |
+            The scheduled health check workflow failed.
+
+            ## Details
+            - **Workflow:** Scheduled Health Check
+            - **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ## Possible Causes
+            - NuGet CLI endpoint unavailable
+            - Microsoft.CrmSdk.CoreTools package unavailable
+            - SolutionPackager.exe execution failure
+            - PSScriptAnalyzer or Pester test failures
+
+            Please investigate and resolve the issue.
         run: |
           set -euo pipefail
           # Check for existing open issue to avoid duplicates
-          EXISTING=$(gh issue list --label "health-check-failure" --state open --json number --jq '.[0].number // empty')
+          EXISTING=$(gh issue list --label "status:health-check-failure" --state open --json number --jq '.[0].number // empty')
 
           if [[ -n "$EXISTING" ]]; then
             echo "Existing issue #$EXISTING found, adding comment"
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             gh issue comment "$EXISTING" --body "Health check failed again on $(date -u '+%Y-%m-%d %H:%M UTC'). [View workflow run]($RUN_URL)"
           else
             echo "Creating new failure issue"
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            ISSUE_BODY='The scheduled health check workflow failed.
-
-          ## Details
-          - **Workflow:** Scheduled Health Check
-          - **Run URL:** RUN_URL_PLACEHOLDER
-
-          ## Possible Causes
-          - NuGet CLI endpoint unavailable
-          - Microsoft.CrmSdk.CoreTools package unavailable
-          - SolutionPackager.exe execution failure
-          - PSScriptAnalyzer or Pester test failures
-
-          Please investigate and resolve the issue.'
-            # Replace placeholder with actual URL
-            ISSUE_BODY="${ISSUE_BODY//RUN_URL_PLACEHOLDER/$RUN_URL}"
             gh issue create \
               --title "Scheduled health check failed" \
-              --label "health-check-failure,type:bug" \
+              --label "status:health-check-failure,type:bug" \
               --body "$ISSUE_BODY"
           fi
 
@@ -233,7 +232,7 @@ jobs:
     name: Close Stale Failure Issues
     runs-on: ubuntu-latest
     needs: health-check
-    if: success() && github.event_name == 'schedule' || success() && github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation
+    if: success() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation))
     timeout-minutes: 5
 
     permissions:
@@ -253,7 +252,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          issues=$(gh issue list --label "health-check-failure" --state open --json number --jq '.[].number' || true)
+          issues=$(gh issue list --label "status:health-check-failure" --state open --json number --jq '.[].number' || true)
           if [[ -n "$issues" ]]; then
             while read -r issue; do
               echo "Closing issue #$issue"

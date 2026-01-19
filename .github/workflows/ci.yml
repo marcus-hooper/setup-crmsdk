@@ -37,7 +37,7 @@ jobs:
             github.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -67,9 +67,11 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
             github.com:443
+            psg-prod-eastus.azureedge.net:443
+            www.powershellgallery.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -104,6 +106,7 @@ jobs:
 
   unit-test:
     name: Run Pester Tests
+    needs: [lint-and-format]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -125,7 +128,7 @@ jobs:
             uploader.codecov.io:443
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -186,6 +189,7 @@ jobs:
 
   integration-test:
     name: Integration Test
+    needs: [lint-and-format]
     runs-on: windows-latest
     timeout-minutes: 15
 
@@ -202,34 +206,37 @@ jobs:
             github.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Validate action.yml
-        shell: pwsh
+      - name: Validate action.yml syntax
+        shell: bash
         run: |
-          Write-Host "Validating action.yml..."
-          if (-not (Test-Path action.yml)) {
-            Write-Error "action.yml not found"
+          echo "Validating action.yml..."
+          if [[ ! -f action.yml ]]; then
+            echo "::error::action.yml not found"
             exit 1
-          }
-          $content = Get-Content action.yml -Raw
+          fi
+          if ! yq eval '.' action.yml > /dev/null 2>&1; then
+            echo "::error::action.yml is not valid YAML"
+            exit 1
+          fi
+          echo "action.yml is valid YAML"
 
+      - name: Validate action.yml structure
+        shell: bash
+        run: |
           # Check for required composite action fields
-          if ($content -notmatch '(?m)^name:') {
-            Write-Error "action.yml missing 'name' field"
+          if [[ "$(yq eval '.name' action.yml)" == "null" ]]; then
+            echo "::error::action.yml missing 'name' field"
             exit 1
-          }
-          if ($content -notmatch '(?m)^runs:') {
-            Write-Error "action.yml missing 'runs' field"
+          fi
+          if [[ "$(yq eval '.runs.using' action.yml)" != "composite" ]]; then
+            echo "::error::action.yml missing 'runs.using: composite'"
             exit 1
-          }
-          if ($content -notmatch 'using:\s*[''"]?composite[''"]?') {
-            Write-Error "action.yml missing 'using: composite' in runs section"
-            exit 1
-          }
-          Write-Host "action.yml validation passed"
+          fi
+          echo "action.yml structure valid"
 
       - name: Run setup-crmsdk action
         uses: ./

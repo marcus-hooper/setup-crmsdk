@@ -8,7 +8,9 @@ body:
       value: |
         Thanks for reporting a bug! Please fill out the information below to help us investigate.
 
-        **Tip**: Enable debug logging by setting `ACTIONS_STEP_DEBUG: true` in your repository secrets for more detailed output.
+        **Before submitting**, please review the [README](https://github.com/marcus-hooper/setup-crmsdk#readme) for usage guidance.
+
+        **Tip**: Enable debug logging by adding `ACTIONS_STEP_DEBUG: true` to your repository secrets or workflow env for more detailed output.
 
   - type: textarea
     id: description
@@ -45,6 +47,10 @@ body:
     attributes:
       label: Actual Behavior
       description: What actually happened?
+      placeholder: |
+        Describe the actual behavior:
+        - What output did you see?
+        - Did it fail silently or with an error?
     validations:
       required: true
 
@@ -73,6 +79,7 @@ body:
         - windows-2022
         - windows-2019
         - Self-hosted Windows (specify in additional context)
+        - Other (specify in additional context)
     validations:
       required: true
 
@@ -103,12 +110,15 @@ body:
     validations:
       required: false
 
-  - type: input
+  - type: textarea
     id: error-message
     attributes:
       label: Error Message
-      description: The exact error message (if any)
-      placeholder: "Install-Package: Unable to resolve package..."
+      description: The exact error message (if any), including stack traces
+      render: shell
+      placeholder: |
+        Install-Package: Unable to resolve package...
+        At D:\a\repo\Install-CrmSdk.ps1:42 char:5
     validations:
       required: false
 
@@ -127,7 +137,7 @@ body:
     attributes:
       label: Prerequisites
       options:
-        - label: I have searched existing issues for duplicates
+        - label: I have [searched existing issues](https://github.com/marcus-hooper/setup-crmsdk/issues?q=is%3Aissue) for duplicates
           required: true
 
   - type: textarea

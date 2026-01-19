@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for suggesting a feature! Please describe what you'd like to see.
 
-        **Before submitting**, please [search existing issues](https://github.com/marcus-hooper/setup-crmsdk/issues?q=is%3Aissue+label%3Atype%3Afeature) to avoid duplicates.
+        **Before submitting**, please [search existing issues](../../issues?q=is%3Aissue+label%3Atype%3Afeature) to avoid duplicates.
 
   - type: textarea
     id: problem
@@ -40,12 +40,13 @@ body:
     id: area
     attributes:
       label: Area
-      description: Which part of the action does this affect?
+      description: Which part of setup-crmsdk does this affect?
       multiple: true
       options:
         - Installation process
         - Environment variable handling
         - SDK version management
+        - Performance
         - Error handling / logging
         - Documentation
         - CI / Workflows
