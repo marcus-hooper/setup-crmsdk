@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Enabled major version updates in Dependabot configuration
+- Refactored automerge workflow to use environment variables for strings
 - Switched Pester test results to JUnit format for better CI reporting
 - Replaced heredoc syntax with single-quoted strings in workflows for Windows compatibility
 - Enhanced bug report issue template with additional form fields
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SolutionPackager verification in CI workflow now checks command output instead of exit code
 - Pester test reporter configuration in CI workflow
 - Security scanner allow-list in security workflow
 - Changelog reference link
