@@ -86,7 +86,7 @@ jobs:
           # Try atomic update first (PATCH), fall back to create if tag doesn't exist
           if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$MAJOR" \
             -f sha="${{ github.sha }}" \
-            -f force=true 2>/dev/null; then
+            -F force=true 2>/dev/null; then
             # Tag doesn't exist, create it
             gh api "repos/${{ github.repository }}/git/refs" \
               -f ref="refs/tags/$MAJOR" \
