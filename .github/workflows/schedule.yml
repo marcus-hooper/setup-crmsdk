@@ -202,22 +202,19 @@ jobs:
           else
             echo "Creating new failure issue"
             RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            ISSUE_BODY=$(cat <<'EOF'
-The scheduled health check workflow failed.
+            ISSUE_BODY='The scheduled health check workflow failed.
 
-## Details
-- **Workflow:** Scheduled Health Check
-- **Run URL:** RUN_URL_PLACEHOLDER
+          ## Details
+          - **Workflow:** Scheduled Health Check
+          - **Run URL:** RUN_URL_PLACEHOLDER
 
-## Possible Causes
-- NuGet CLI endpoint unavailable
-- Microsoft.CrmSdk.CoreTools package unavailable
-- SolutionPackager.exe execution failure
-- PSScriptAnalyzer or Pester test failures
+          ## Possible Causes
+          - NuGet CLI endpoint unavailable
+          - Microsoft.CrmSdk.CoreTools package unavailable
+          - SolutionPackager.exe execution failure
+          - PSScriptAnalyzer or Pester test failures
 
-Please investigate and resolve the issue.
-EOF
-)
+          Please investigate and resolve the issue.'
             # Replace placeholder with actual URL
             ISSUE_BODY="${ISSUE_BODY//RUN_URL_PLACEHOLDER/$RUN_URL}"
             gh issue create \

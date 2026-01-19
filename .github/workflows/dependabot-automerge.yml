@@ -60,16 +60,13 @@ jobs:
           # Check if we already commented on this PR
           EXISTING_COMMENT=$(gh pr view "$PR_URL" --json comments --jq '.comments[].body' | grep -c "GitHub Actions update requires manual merge" || true)
           if [ "$EXISTING_COMMENT" -eq "0" ]; then
-            gh pr comment "$PR_URL" --body "$(cat <<'EOF'
-**GitHub Actions update requires manual merge**
+            gh pr comment "$PR_URL" --body '**GitHub Actions update requires manual merge**
 
-This PR updates a GitHub Actions workflow dependency.
+          This PR updates a GitHub Actions workflow dependency.
 
-Due to GitHub security restrictions, the `GITHUB_TOKEN` cannot modify workflow files, so this PR cannot be auto-merged.
+          Due to GitHub security restrictions, the `GITHUB_TOKEN` cannot modify workflow files, so this PR cannot be auto-merged.
 
-**Action required:** Please review and merge this PR manually.
-EOF
-)"
+          **Action required:** Please review and merge this PR manually.'
           else
             echo "Comment already exists, skipping"
           fi
@@ -88,19 +85,16 @@ EOF
           # Check if we already commented on this PR
           EXISTING_COMMENT=$(gh pr view "$PR_URL" --json comments --jq '.comments[].body' | grep -c "Major version update detected" || true)
           if [ "$EXISTING_COMMENT" -eq "0" ]; then
-            gh pr comment "$PR_URL" --body "$(cat <<'EOF'
-**Major version update detected**
+            gh pr comment "$PR_URL" --body '**Major version update detected**
 
-This PR updates a dependency to a new major version.
+          This PR updates a dependency to a new major version.
 
-**Action required:**
-1. Review the changelog for breaking changes
-2. Test thoroughly before merging
-3. Merge manually when ready
+          **Action required:**
+          1. Review the changelog for breaking changes
+          2. Test thoroughly before merging
+          3. Merge manually when ready
 
-Major updates are not auto-merged for safety.
-EOF
-)"
+          Major updates are not auto-merged for safety.'
           else
             echo "Comment already exists, skipping"
           fi
@@ -119,21 +113,18 @@ EOF
           # Check if we already commented on this PR
           EXISTING_COMMENT=$(gh pr view "$PR_URL" --json comments --jq '.comments[].body' | grep -c "GitHub Actions major version update" || true)
           if [ "$EXISTING_COMMENT" -eq "0" ]; then
-            gh pr comment "$PR_URL" --body "$(cat <<'EOF'
-**GitHub Actions major version update**
+            gh pr comment "$PR_URL" --body '**GitHub Actions major version update**
 
-This PR updates a GitHub Actions dependency to a new major version.
+          This PR updates a GitHub Actions dependency to a new major version.
 
-**Action required:**
-1. Review the changelog for breaking changes
-2. Test thoroughly before merging
-3. Merge manually when ready
+          **Action required:**
+          1. Review the changelog for breaking changes
+          2. Test thoroughly before merging
+          3. Merge manually when ready
 
-> **Note:** Due to GitHub security restrictions, the `GITHUB_TOKEN` cannot modify workflow files, so this PR cannot be auto-merged regardless of version type.
+          > **Note:** Due to GitHub security restrictions, the `GITHUB_TOKEN` cannot modify workflow files, so this PR cannot be auto-merged regardless of version type.
 
-Major updates are not auto-merged for safety.
-EOF
-)"
+          Major updates are not auto-merged for safety.'
           else
             echo "Comment already exists, skipping"
           fi
