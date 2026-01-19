@@ -187,7 +187,7 @@ jobs:
           # Allow-list: file:pattern pairs for known-safe usages
           # Format: "relative/path/to/file.ps1:PatternToAllow"
           $allowList = @(
-            # Example: "scripts/Install-CrmSdk.psm1:DownloadFile" - if legitimate download is needed
+            ".github/workflows/security.yml:Invoke-Expression"  # Scanner's own pattern definition
           )
 
           $issues = @()

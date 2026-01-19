@@ -173,7 +173,7 @@ jobs:
         with:
           name: Pester Tests
           path: test-results.xml
-          reporter: java-junit
+          reporter: dotnet-nunit
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
