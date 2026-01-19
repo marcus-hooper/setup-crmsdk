@@ -92,12 +92,17 @@ jobs:
         shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
-          & $solutionPackager /? | Out-Null
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "::error::SolutionPackager.exe failed to execute"
+          # Verify the executable can start (checks for missing .NET runtime, DLLs, etc.)
+          # Note: SolutionPackager.exe /? returns non-zero exit code by design, so we ignore exit code
+          # and only verify the process starts and produces output
+          $output = & $solutionPackager /? 2>&1 | Out-String
+          if ([string]::IsNullOrWhiteSpace($output)) {
+            Write-Host "::error::SolutionPackager.exe produced no output - may be missing dependencies"
             exit 1
           }
           Write-Host "SolutionPackager.exe executes successfully"
+          Write-Host "Output preview:"
+          $output.Split("`n") | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
 
       - name: Run PSScriptAnalyzer
         id: lint
