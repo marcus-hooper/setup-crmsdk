@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
+    paths-ignore: &paths-ignore
       - '**.md'
       - 'docs/**'
       - '.github/*.md'
@@ -12,12 +12,7 @@ on:
       - 'LICENSE'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/*.md'
-      - '.github/ISSUE_TEMPLATE/**'
-      - 'LICENSE'
+    paths-ignore: *paths-ignore
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -111,6 +106,9 @@ jobs:
     name: Run Pester Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - name: Harden Runner
@@ -166,14 +164,23 @@ jobs:
           path: |
             test-results.xml
             coverage.xml
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
+
+      - name: Publish test results
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2.5.0
+        if: always()
+        with:
+          name: Pester Tests
+          path: test-results.xml
+          reporter: java-junit
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           files: coverage.xml
           fail_ci_if_error: false
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
@@ -198,6 +205,31 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
+
+      - name: Validate action.yml
+        shell: pwsh
+        run: |
+          Write-Host "Validating action.yml..."
+          if (-not (Test-Path action.yml)) {
+            Write-Error "action.yml not found"
+            exit 1
+          }
+          $content = Get-Content action.yml -Raw
+
+          # Check for required composite action fields
+          if ($content -notmatch '(?m)^name:') {
+            Write-Error "action.yml missing 'name' field"
+            exit 1
+          }
+          if ($content -notmatch '(?m)^runs:') {
+            Write-Error "action.yml missing 'runs' field"
+            exit 1
+          }
+          if ($content -notmatch 'using:\s*[''"]?composite[''"]?') {
+            Write-Error "action.yml missing 'using: composite' in runs section"
+            exit 1
+          }
+          Write-Host "action.yml validation passed"
 
       - name: Run setup-crmsdk action
         uses: ./
@@ -228,12 +260,6 @@ jobs:
     needs: [validate-changelog, lint-and-format, unit-test, integration-test]
 
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
-        with:
-          egress-policy: block
-          allowed-endpoints: ""
-
       - name: Check CI status
         run: |
           if [[ "${{ needs.validate-changelog.result }}" != "success" ]] || \

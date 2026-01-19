@@ -6,6 +6,11 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
     # Allow manual trigger for debugging
+    inputs:
+      skip_issue_creation:
+        description: "Skip creating/updating GitHub issues on failure"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,6 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify NuGet CLI is downloadable
+        id: verify-nuget
         timeout-minutes: 2
         shell: pwsh
         run: |
@@ -48,6 +54,7 @@ jobs:
           Write-Host "NuGet CLI endpoint is accessible (HTTP $($response.StatusCode))"
 
       - name: Verify CrmSdk package exists on NuGet
+        id: verify-package
         timeout-minutes: 2
         shell: pwsh
         run: |
@@ -56,9 +63,11 @@ jobs:
           Write-Host "Microsoft.CrmSdk.CoreTools is available on NuGet (latest: $latestVersion)"
 
       - name: Run setup-crmsdk action
+        id: run-action
         uses: ./
 
       - name: Verify CRM_SDK_PATH is set
+        id: verify-env
         shell: pwsh
         run: |
           if (-not $env:CRM_SDK_PATH) {
@@ -68,6 +77,7 @@ jobs:
           Write-Host "CRM_SDK_PATH is set to: $env:CRM_SDK_PATH"
 
       - name: Verify SolutionPackager exists
+        id: verify-packager
         shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
@@ -78,6 +88,7 @@ jobs:
           Write-Host "SolutionPackager.exe found at: $solutionPackager"
 
       - name: Verify SolutionPackager executes
+        id: verify-execution
         shell: pwsh
         run: |
           $solutionPackager = Join-Path $env:CRM_SDK_PATH "coretools\SolutionPackager.exe"
@@ -89,6 +100,7 @@ jobs:
           Write-Host "SolutionPackager.exe executes successfully"
 
       - name: Run PSScriptAnalyzer
+        id: lint
         shell: pwsh
         run: |
           $results = Invoke-ScriptAnalyzer -Path ./scripts -Recurse -Settings PSGallery -ErrorAction Stop
@@ -100,6 +112,7 @@ jobs:
           Write-Host "No issues found"
 
       - name: Run Pester tests
+        id: test
         shell: pwsh
         run: |
           if (Test-Path './tests') {
@@ -115,6 +128,28 @@ jobs:
             Write-Host "No tests directory found - skipping"
           }
 
+      - name: Write workflow summary
+        if: always()
+        shell: pwsh
+        run: |
+          $summary = @"
+          ## Health Check Results
+
+          | Check | Status |
+          |-------|--------|
+          | NuGet CLI accessible | ${{ steps.verify-nuget.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | CrmSdk package available | ${{ steps.verify-package.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | Action execution | ${{ steps.run-action.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | CRM_SDK_PATH set | ${{ steps.verify-env.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | SolutionPackager exists | ${{ steps.verify-packager.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | SolutionPackager executes | ${{ steps.verify-execution.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | PSScriptAnalyzer | ${{ steps.lint.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+          | Pester tests | ${{ steps.test.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |
+
+          **Workflow run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          "@
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
       - name: Upload test results
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
@@ -129,7 +164,7 @@ jobs:
     name: Notify on Failure
     runs-on: ubuntu-latest
     needs: health-check
-    if: failure() && github.event_name == 'schedule'
+    if: failure() && github.event_name == 'schedule' || failure() && github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation
     timeout-minutes: 5
 
     permissions:
@@ -148,6 +183,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           gh label create "health-check-failure" --description "Automated health check detected a failure" --color "d73a4a" --force
 
       - name: Create failure issue
@@ -155,6 +191,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           # Check for existing open issue to avoid duplicates
           EXISTING=$(gh issue list --label "health-check-failure" --state open --json number --jq '.[0].number // empty')
 
@@ -165,23 +202,24 @@ jobs:
           else
             echo "Creating new failure issue"
             RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            ISSUE_BODY=$(cat <<EOF
-          The scheduled health check workflow failed on $(date -u '+%Y-%m-%d %H:%M UTC').
+            ISSUE_BODY=$(cat <<'EOF'
+The scheduled health check workflow failed.
 
-          ## Details
-          - **Workflow:** ${{ github.workflow }}
-          - **Run ID:** ${{ github.run_id }}
-          - **Run URL:** $RUN_URL
+## Details
+- **Workflow:** Scheduled Health Check
+- **Run URL:** RUN_URL_PLACEHOLDER
 
-          ## Possible Causes
-          - NuGet CLI endpoint unavailable
-          - Microsoft.CrmSdk.CoreTools package unavailable
-          - SolutionPackager.exe execution failure
-          - Test failures
+## Possible Causes
+- NuGet CLI endpoint unavailable
+- Microsoft.CrmSdk.CoreTools package unavailable
+- SolutionPackager.exe execution failure
+- PSScriptAnalyzer or Pester test failures
 
-          Please investigate and resolve the issue.
-          EOF
-          )
+Please investigate and resolve the issue.
+EOF
+)
+            # Replace placeholder with actual URL
+            ISSUE_BODY="${ISSUE_BODY//RUN_URL_PLACEHOLDER/$RUN_URL}"
             gh issue create \
               --title "Scheduled health check failed" \
               --label "health-check-failure,type:bug" \
@@ -193,7 +231,7 @@ jobs:
     name: Close Stale Failure Issues
     runs-on: ubuntu-latest
     needs: health-check
-    if: success() && github.event_name == 'schedule'
+    if: success() && github.event_name == 'schedule' || success() && github.event_name == 'workflow_dispatch' && !inputs.skip_issue_creation
     timeout-minutes: 5
 
     permissions:
@@ -212,10 +250,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh issue list --label "health-check-failure" --state open --json number --jq '.[].number' | while read -r issue; do
-            if [[ -n "$issue" ]]; then
+          set -euo pipefail
+          issues=$(gh issue list --label "health-check-failure" --state open --json number --jq '.[].number' || true)
+          if [[ -n "$issues" ]]; then
+            while read -r issue; do
               echo "Closing issue #$issue"
               gh issue close "$issue" --comment "Health check is passing again as of $(date -u '+%Y-%m-%d %H:%M UTC'). Closing automatically."
-            fi
-          done
+            done <<< "$issues"
+          fi
           echo "Done processing stale failure issues"

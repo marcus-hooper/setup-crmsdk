@@ -44,6 +44,7 @@ jobs:
             api.securityscorecards.dev:443
             fulcio.sigstore.dev:443
             github.com:443
+            objects.githubusercontent.com:443
             oss-fuzz-build-logs.storage.googleapis.com:443
             rekor.sigstore.dev:443
             tuf-repo-cdn.sigstore.dev:443
@@ -66,7 +67,7 @@ jobs:
         with:
           name: scorecard-sarif
           path: results.sarif
-          retention-days: 5
+          retention-days: 14
 
   # Job 2: Process SARIF and upload to GitHub Code Scanning (allows run steps)
   upload:
@@ -97,8 +98,8 @@ jobs:
       - name: Add SARIF summary
         run: |
           set -euo pipefail
-          # Add a summary note to the first SARIF run's invocations to describe what Scorecard evaluated.
-          jq '.runs[0].invocations = [{"executionSuccessful": true, "toolExecutionNotifications": [{"level": "note", "message": {"text": "Scorecard evaluated repository security posture across multiple checks including branch protection, dependency management, CI/CD security, and vulnerability disclosure."}, "descriptor": {"id": "scanned-files-summary"}}]}]' \
+          # Add a summary note to the first SARIF run's invocations, preserving any existing invocation data.
+          jq '.runs[0].invocations = (.runs[0].invocations // []) + [{"executionSuccessful": true, "toolExecutionNotifications": [{"level": "note", "message": {"text": "Scorecard evaluated repository security posture across 18 checks including branch protection, dependency management, CI/CD security, and vulnerability disclosure."}, "descriptor": {"id": "scanned-files-summary"}}]}]' \
             results.sarif > results.tmp
           mv results.tmp results.sarif
 

@@ -8,6 +8,8 @@ body:
       value: |
         Thanks for reporting a bug! Please fill out the information below to help us investigate.
 
+        **Tip**: Enable debug logging by setting `ACTIONS_STEP_DEBUG: true` in your repository secrets for more detailed output.
+
   - type: textarea
     id: description
     attributes:
@@ -50,13 +52,15 @@ body:
     id: workflow
     attributes:
       label: Workflow Configuration
-      description: Paste your workflow YAML (or relevant portion)
+      description: Paste your workflow YAML (redact any secrets)
       render: yaml
       placeholder: |
         - name: Setup CRM SDK
           uses: marcus-hooper/setup-crmsdk@v1
+          with:
+            version: '9.1.0.184'
     validations:
-      required: false
+      required: true
 
   - type: dropdown
     id: runner
@@ -65,9 +69,10 @@ body:
       description: Which runner are you using?
       options:
         - windows-latest
+        - windows-2025
         - windows-2022
         - windows-2019
-        - Self-hosted Windows
+        - Self-hosted Windows (specify in additional context)
     validations:
       required: true
 
@@ -80,15 +85,50 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: crmsdk-version
+    attributes:
+      label: CRM SDK Version Requested
+      description: The version input value (leave blank if using latest)
+      placeholder: "9.1.0.184"
+    validations:
+      required: false
+
+  - type: input
+    id: powershell-version
+    attributes:
+      label: PowerShell Version
+      description: Output of $PSVersionTable.PSVersion (if known)
+      placeholder: "5.1.22621.4111"
+    validations:
+      required: false
+
+  - type: input
+    id: error-message
+    attributes:
+      label: Error Message
+      description: The exact error message (if any)
+      placeholder: "Install-Package: Unable to resolve package..."
+    validations:
+      required: false
+
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: Paste relevant logs from the workflow run
+      description: Paste relevant logs from the workflow run (redact sensitive info)
       render: shell
       placeholder: Expand the "Setup CRM SDK" step and copy relevant output
     validations:
-      required: false
+      required: true
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
 
   - type: textarea
     id: context

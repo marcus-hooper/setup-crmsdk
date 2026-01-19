@@ -11,11 +11,21 @@ updates:
     open-pull-requests-limit: 3
     rebase-strategy: "auto"
     groups:
-      github-actions:
+      security-actions:
         patterns:
-          - "*"
+          - "ossf/*"
+          - "github/codeql-action"
+          - "step-security/*"
+      ci-actions:
+        patterns:
+          - "actions/*"
+          - "github/dependency-review-action"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "ci"
+      include: "scope"

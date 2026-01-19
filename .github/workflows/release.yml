@@ -6,13 +6,14 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   update-major-tag:
     name: Update Major Version Tag
+    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -29,32 +30,12 @@ jobs:
             github.com:443
 
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Skip pre-releases
-        if: github.event.release.prerelease
-        run: |
-          echo "::notice::Skipping major tag update for pre-release"
-          echo "## Pre-release Skipped" >> "$GITHUB_STEP_SUMMARY"
-          echo "Major version tag not updated for pre-release." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Check for CHANGELOG entry
-        if: ${{ !github.event.release.prerelease }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION="${TAG#v}"
-          if ! grep -qE "^## \[$VERSION\]" CHANGELOG.md; then
-            echo "::error::No CHANGELOG entry found for version $VERSION"
-            exit 1
-          fi
-
-      - name: Extract version info
-        if: ${{ !github.event.release.prerelease }}
+      - name: Extract and validate version
         id: version
         shell: bash
         run: |
@@ -73,8 +54,22 @@ jobs:
           echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
           echo "Extracted major version: $MAJOR from tag: $TAG"
 
+      - name: Check for CHANGELOG entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md not found"
+            exit 1
+          fi
+          if ! grep -qE "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::No CHANGELOG entry found for version $VERSION"
+            exit 1
+          fi
+
       - name: Update major version tag
-        if: ${{ !github.event.release.prerelease }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,20 +78,99 @@ jobs:
           MAJOR="${{ steps.version.outputs.major }}"
           TAG="${{ steps.version.outputs.tag }}"
 
-          # Try atomic update first (PATCH), fall back to create if tag doesn't exist
-          if ! gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$MAJOR" \
-            -f sha="${{ github.sha }}" \
-            -F force=true 2>/dev/null; then
-            # Tag doesn't exist, create it
-            gh api "repos/${{ github.repository }}/git/refs" \
-              -f ref="refs/tags/$MAJOR" \
-              -f sha="${{ github.sha }}"
+          update_tag() {
+            # Try atomic update first (PATCH), fall back to create if tag doesn't exist
+            if OUTPUT=$(gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$MAJOR" \
+              -f sha="${{ github.sha }}" \
+              -F force=true 2>&1); then
+              echo "Updated existing $MAJOR tag"
+              return 0
+            else
+              # Check if it's a "not found" error (tag doesn't exist yet)
+              if echo "$OUTPUT" | grep -qi "not found"; then
+                echo "Tag $MAJOR doesn't exist, creating it"
+                gh api "repos/${{ github.repository }}/git/refs" \
+                  -f ref="refs/tags/$MAJOR" \
+                  -f sha="${{ github.sha }}"
+                return 0
+              else
+                echo "::warning::API call failed: $OUTPUT"
+                return 1
+              fi
+            fi
+          }
+
+          # Retry with exponential backoff (3 attempts: 0s, 2s, 4s delays)
+          MAX_ATTEMPTS=3
+          for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+            if update_tag; then
+              echo "Updated $MAJOR tag to point to $TAG"
+              exit 0
+            fi
+            if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+              DELAY=$((2 ** (i - 1)))
+              echo "Retrying in ${DELAY}s (attempt $((i + 1))/$MAX_ATTEMPTS)..."
+              sleep "$DELAY"
+            fi
+          done
+
+          echo "::error::Failed to update tag after $MAX_ATTEMPTS attempts"
+          exit 1
+
+      - name: Verify tag update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          MAJOR="${{ steps.version.outputs.major }}"
+          EXPECTED_SHA="${{ github.sha }}"
+
+          # Retry verification with backoff (handles eventual consistency)
+          MAX_ATTEMPTS=3
+          for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+            ACTUAL_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/$MAJOR" --jq '.object.sha' 2>/dev/null || echo "")
+
+            if [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ]; then
+              echo "Verified $MAJOR tag points to $EXPECTED_SHA"
+              exit 0
+            fi
+
+            if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+              DELAY=$((2 ** (i - 1)))
+              echo "Verification attempt $i failed (got: $ACTUAL_SHA), retrying in ${DELAY}s..."
+              sleep "$DELAY"
+            fi
+          done
+
+          echo "::error::Tag verification failed after $MAX_ATTEMPTS attempts. Expected $EXPECTED_SHA but got $ACTUAL_SHA"
+          exit 1
+
+      - name: Update release with CHANGELOG notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${TAG#v}"
+
+          # Extract changelog section for this version
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          # Update release body if we extracted notes
+          if [ -n "$NOTES" ]; then
+            gh release edit "$TAG" --notes "$NOTES"
+            echo "Updated release notes from CHANGELOG.md"
+          else
+            echo "No changelog content to extract (section may be empty)"
           fi
 
-          echo "Updated $MAJOR tag to point to $TAG"
-
       - name: Write job summary
-        if: ${{ !github.event.release.prerelease }}
         shell: bash
         run: |
           set -euo pipefail

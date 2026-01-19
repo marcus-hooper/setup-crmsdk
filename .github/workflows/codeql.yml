@@ -24,7 +24,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 permissions: {}
 
@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 15
 
     permissions:
+      actions: read
       contents: read
       security-events: write
 
@@ -69,3 +70,12 @@ jobs:
         uses: github/codeql-action/analyze@fb650c22f965a3eff7e20c5535e51a256dd16bf1 # v4
         with:
           category: "/language:actions"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## CodeQL Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Languages analyzed:** GitHub Actions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Results are available in the [Security tab](https://github.com/${{ github.repository }}/security/code-scanning)." >> $GITHUB_STEP_SUMMARY
