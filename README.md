@@ -2,12 +2,12 @@
 
 [![CI](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/marcus-hooper/setup-crmsdk/graph/badge.svg)](https://codecov.io/gh/marcus-hooper/setup-crmsdk)
-[![GitHub release](https://img.shields.io/github/v/release/marcus-hooper/setup-crmsdk)](https://github.com/marcus-hooper/setup-crmsdk/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
 [![CodeQL](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://scorecard.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
 [![Security](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/security.yml/badge.svg)](https://github.com/marcus-hooper/setup-crmsdk/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcus-hooper/setup-crmsdk/badge)](https://scorecard.dev/viewer/?uri=github.com/marcus-hooper/setup-crmsdk)
+[![GitHub release](https://img.shields.io/github/v/release/marcus-hooper/setup-crmsdk)](https://github.com/marcus-hooper/setup-crmsdk/releases)
+[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A GitHub Action that installs Microsoft.CrmSdk.CoreTools and sets the `CRM_SDK_PATH` environment variable for use in CI/CD workflows.
 
