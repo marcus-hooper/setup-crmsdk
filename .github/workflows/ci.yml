@@ -204,39 +204,43 @@ jobs:
             azureedge.net:443
             dist.nuget.org:443
             github.com:443
+            objects.githubusercontent.com:443
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Validate action.yml syntax
+      - name: Validate action.yml
         shell: bash
+        env:
+          YQ_VERSION: v4.44.6
         run: |
           echo "Validating action.yml..."
           if [[ ! -f action.yml ]]; then
             echo "::error::action.yml not found"
             exit 1
           fi
-          if ! yq eval '.' action.yml > /dev/null 2>&1; then
+
+          # Download yq for Windows
+          curl -sL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_windows_amd64.exe" -o yq.exe
+
+          # Validate YAML syntax
+          if ! ./yq.exe eval '.' action.yml > /dev/null 2>&1; then
             echo "::error::action.yml is not valid YAML"
             exit 1
           fi
-          echo "action.yml is valid YAML"
 
-      - name: Validate action.yml structure
-        shell: bash
-        run: |
           # Check for required composite action fields
-          if [[ "$(yq eval '.name' action.yml)" == "null" ]]; then
+          if [[ "$(./yq.exe eval '.name' action.yml)" == "null" ]]; then
             echo "::error::action.yml missing 'name' field"
             exit 1
           fi
-          if [[ "$(yq eval '.runs.using' action.yml)" != "composite" ]]; then
+          if [[ "$(./yq.exe eval '.runs.using' action.yml)" != "composite" ]]; then
             echo "::error::action.yml missing 'runs.using: composite'"
             exit 1
           fi
-          echo "action.yml structure valid"
+          echo "action.yml validation passed"
 
       - name: Run setup-crmsdk action
         uses: ./
