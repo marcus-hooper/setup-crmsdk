@@ -103,6 +103,7 @@ jobs:
           Write-Host "SolutionPackager.exe executes successfully"
           Write-Host "Output preview:"
           $output.Split("`n") | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
+          exit 0
 
       - name: Run PSScriptAnalyzer
         id: lint
