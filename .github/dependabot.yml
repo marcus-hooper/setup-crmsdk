@@ -17,6 +17,7 @@ updates:
           - "ossf/*"
           - "github/codeql-action"
           - "step-security/*"
+          - "gitleaks/*"
         update-types:
           - "minor"
           - "patch"
@@ -24,7 +25,16 @@ updates:
       ci-actions:
         patterns:
           - "actions/*"
-          - "github/dependency-review-action"
+        update-types:
+          - "minor"
+          - "patch"
+      # Utility actions
+      utility-actions:
+        patterns:
+          - "dependabot/*"
+          - "dorny/*"
+          - "codecov/*"
+          - "EndBug/*"
         update-types:
           - "minor"
           - "patch"
