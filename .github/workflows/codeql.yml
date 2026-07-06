@@ -61,7 +61,7 @@ jobs:
       # - PSScriptAnalyzer in ci.yml (lint and security rules)
       # - Custom security checks in security.yml (hardcoded secrets, unsafe patterns)
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@9cea5827c668a1fe7165dbce6e80c3f9cf3f83ac # v4
+        uses: github/codeql-action/init@006d029c8dc7b906d4ce5b7c700d32f20f2d35dd # v4
         with:
           languages: actions
           queries: security-and-quality
