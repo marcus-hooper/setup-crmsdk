@@ -18,9 +18,6 @@ updates:
           - "github/codeql-action"
           - "step-security/*"
           - "gitleaks/*"
-        update-types:
-          - "minor"
-          - "patch"
       # CI/CD actions
       ci-actions:
         patterns:
