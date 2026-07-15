@@ -11,11 +11,18 @@ updates:
     open-pull-requests-limit: 3
     rebase-strategy: "auto"
     groups:
+      # CodeQL sub-actions (init, analyze, upload-sarif) are ONE release train and must
+      # bump together across ALL update types, or CodeQL desyncs at runtime ("Loaded a
+      # configuration file for version X, but running version Y"). The trailing "*" is
+      # required — Dependabot names these deps by full sub-path (github/codeql-action/init).
+      # Listed FIRST so it wins over the security-actions group (first-matching-group).
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
       # Security-related actions - prioritize these
       security-actions:
         patterns:
           - "ossf/*"
-          - "github/codeql-action"
           - "step-security/*"
           - "gitleaks/*"
       # CI/CD actions
