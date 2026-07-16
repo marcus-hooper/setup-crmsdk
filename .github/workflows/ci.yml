@@ -197,7 +197,12 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: block
+          # Audit (not block) on this Windows job: harden-runner 2.20.0 began enforcing
+          # block policy on Windows GitHub-hosted runners, which blocks the Azure platform
+          # DNS resolver (168.63.129.16:53) and breaks all name resolution here. Linux jobs
+          # in this workflow keep egress-policy: block. allowed-endpoints is retained for
+          # documentation and to ease switching back to block once Windows DNS is sorted.
+          egress-policy: audit
           allowed-endpoints: >
             api.github.com:443
             api.nuget.org:443
